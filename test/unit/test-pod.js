@@ -127,6 +127,15 @@ PodJSTest.prototype.testPodAbstractMethods = function() {
         // pass
     }
     
+    // Check newResource() is abstract
+    try {
+        example.newResource();
+        fail("Should not have allowed call of abstract method");
+    } catch (e) {
+        if (e.name === "AssertError") throw e;
+        // pass
+    }
+    
     // Check newBlock() is abstract
     try {
         example.newBlock();
@@ -138,23 +147,21 @@ PodJSTest.prototype.testPodAbstractMethods = function() {
 
 };
 
-// Check that abstract methods throw errors when not overridden.
 PodJSTest.prototype.testPodNewResource = function() {
     // Define ExamplePod
     var ExamplePod = function(initParams) {
         PodJS.Pod.call(this, initParams);
-        
-        var superNewResource = this.newResource;
         
         this.getResourceTypes = function() {
             return ["sprite", "stage"];
         };
 
         this.newResource = function(resourceType, resourceName, options) {
-            var resourceBase = superNewResource.call(this, resourceType, resourceName, options);
+            var resourceBase = this.newResourceClass(resourceType, resourceName, options);
             var resource = Object.create(resourceBase);
+            // normally we'd extend this class to add additional functionality.
             return resource;
-        }
+        };
     };
     ExamplePod.prototype = Object.create(PodJS.Pod.prototype);
     ExamplePod.constructor = ExamplePod;
@@ -231,3 +238,62 @@ PodJSTest.prototype.testPodNewResource = function() {
         // pass
     }
 };
+
+/////////////////////////////////////////////////////////////
+// Test PodJS.Block
+
+PodJSTest.prototype.testBlock = function() {
+    // Define ExamplePod
+    var ExamplePod = function(initParams) {
+        PodJS.Pod.call(this, initParams);
+        
+        this.getBlockTypes = function() {
+            return ["sprite_move", "sprite_next_costume"];
+        };
+        
+        this.newBlock = function(blockType, resource, params) {
+            var blockClass = this.newBlockClass(blockType, resource, params);
+            var block = Object.create(blockClass);
+            return block;
+        };
+    };
+    ExamplePod.prototype = Object.create(PodJS.Pod.prototype);
+    ExamplePod.constructor = ExamplePod;
+    PodJS.REGISTER_POD_CLASS("example4", ExamplePod);
+    
+    // Create an environment and pod
+    var env = new PodJS();
+    var example = env.pod("example4");
+    
+    // Test getBlockTypes()
+    // Note we're really only testing the subclass here since the base class is abstract
+    assertEquals(["sprite_move", "sprite_next_costume"], example.getBlockTypes());
+
+    // Test newBlock()
+    var exampleResource = { a : 1 };
+    var params = { p1 : 1, p2 : 2 };
+    var spriteMoveBlock = example.newBlock("sprite_move", exampleResource, params);
+    assertNotNull(spriteMoveBlock);
+    spriteMoveBlock.tag = 1;
+
+    // test newBlock can be called more than once
+    var spriteMoveBlock2 = example.newBlock("sprite_move", exampleResource, params);
+    assertNotNull(spriteMoveBlock2);
+    spriteMoveBlock2.tag = 2;
+    assertEquals(1, spriteMoveBlock.tag);
+    assertEquals(2, spriteMoveBlock2.tag);
+
+    // test newBlock can be called with a different type
+    var spriteNextCostumeBlock = example.newBlock("sprite_next_costume", exampleResource);
+    assertNotNull(spriteNextCostumeBlock);
+
+    // Test we cannot create a block for a type that is not defined
+    try {
+        example.newBlock("movie", exampleResource);
+        fail("Should not have allowed creating an unknown block type");
+    } catch (e) {
+        if (e.name === "AssertError") throw e;
+        // pass
+    }
+};
+

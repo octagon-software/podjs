@@ -35,7 +35,7 @@ if (/MSIE (\d+\.\d+);/.test(navigator.userAgent)) {
 /**
  * @global
  * @class PodJS
- * @classdesc Main environment for pod.js.
+ * @classdesc Main environment for <a href="http://podjs.com">pod.js</a>.
  *     <p>
  *     The class has a static registry of pod classes which have been loaded. Note that only one version of each Pod class can be
  *     registered globally per page. Pod classes get registered by their corresponding scripts, loaded by the html page.
@@ -45,6 +45,8 @@ if (/MSIE (\d+\.\d+);/.test(navigator.userAgent)) {
  *     <p>
  *     The optional options object provided contains both environment settings and settings that are applicable to specific
  *     pods. Pods will consume only the options they care about.
+ *     <p>
+ *     Author: markroth8
  * 
  * @constructor
  * @desc Constructs a new PodJS environment with the given options.
@@ -65,8 +67,6 @@ if (/MSIE (\d+\.\d+);/.test(navigator.userAgent)) {
  *         <td>Frames per second the ticks should ideally run.</td>
  *       </tr>
  *     </table>
- *
- * @author markroth8
  */
 PodJS = function(options) {
     /**
@@ -200,6 +200,8 @@ PodJS.REGISTER_POD_CLASS = function(podName, podClass) {
  * @author markroth8
  */
 PodJS.Pod = function(initParams) {
+    var _pod = this;
+    
     /**
      * Maps resource types to maps of resource names to resource instances.
      *
@@ -207,6 +209,14 @@ PodJS.Pod = function(initParams) {
      * @type {object}
      */
     var _resourceRegistry = {};
+    
+    /**
+     * The environment this pod is bound to.
+     *
+     * @private
+     * @type {PodJS}
+     */
+    var _environment = initParams.env;
 
     /**
      * Deletes the resource with the given name and deregisters it from the pod.
@@ -314,31 +324,182 @@ PodJS.Pod = function(initParams) {
 
     /**
      * Called when a {@link PodJS.ScriptBuilder} wishes to create a new instance of a block.
+     * <p>
+     * Subclasses should call {@link PodJS.Pod#newBlockClass} to return the constructor for the super-object of the block.
+     * The super-object will be bound to the Pod base class. This pattern is mostly done to enforce the contract that
+     * no blocks can be created other than for the types specified in getBlockTypes(), and for any future bookkeeping needs.
      *
      * @abstract
      * @method newBlock
      * @memberof PodJS.Pod
      * @instance
      * @param {string} blockType The type of block to be created (e.g. "gotoXY"). Must be one of the block types
-     *     returned by {@link getBlockTypes}.
-     * @param {object} [options] Set of options to be used when creating the block.
-     * @returns {PodJS.Block} A new block instance
-     * @throws {Error} If the block type provided was not valid.
+     *     returned by {@link PodJS.Pod#getBlockTypes}.
+     * @param {PodJS.Block#Resource} resource The resource this block is to be bound to.
+     * @param {object} [params] Set of parameters to be used when creating the block (provided by the user).
+     * @returns {PodJS.Pod#Block} The instance of the block.
+     * @throws {Error} If the block type provided was not one of the valid block types returned by {@link PodJS.Pod#getBlockTypes}.
+     *     This check is performed by {@link PodJS.Pod#newBlockClass}.
+     * @throws {Error} If the block to be returned would not be compatible with the resource provided. This check
+     *     must be performed by the subclass.
      */
-    this.newBlock = function(blockType, options) {
+    this.newBlock = function(blockType, resource, params) {
         throw new Error('Method is abstract and must be overridden by a subclass.');
     };
 
+    /**
+     * Called by the concrete Pod class when it wishes to create a new Block, in order to provide the constructor of the
+     * super-class of the block object.
+     * <p>
+     * The constructor will be bound to the Pod base class so that it can update the resource registry during the lifecycle
+     * of the block.
+     *
+     * @method newBlockClass
+     * @memberof PodJS.Pod
+     * @instance
+     * @param {string} blockType The type of block to be created (e.g. "gotoXY"). Must be one of the block types
+     *     returned by {@link PodJS.Pod#getBlockTypes}.
+     * @param {PodJS.Block#Resource} resource The resource this block is to be bound to.
+     * @param {object} [params] Set of parameters to be used when creating the block (provided by the user).
+     * @returns {Function} The constructor of the Block class that the subclass should create a new instance of.
+     * @throws {Error} If the block type provided was not one of the valid block types returned by {@link PodJS.Pod#getBlockTypes}.
+     */
+    this.newBlockClass = function(blockType, resource, params) {
+        // Check that block type is one of the block types supported by this pod.
+        if (this.getBlockTypes().indexOf(blockType) === -1) {
+            throw new Error("This pod does not know how to create blocks of type '" + blockType + "'");
+        }
+        
+        /**
+         * @class PodJS.Pod#BlockContext
+         * @classdesc Context provided to blocks that gives them access to the environment, pod and resource.
+         */
+        var blockContext = {
+            /**
+             * The environment this block is bound to.
+             *
+             * @instance
+             * @member {PodJS} environment
+             * @memberOf PodJS.Pod#BlockContext
+             */
+            environment : _environment,
+
+            /**
+             * The pod this block is bound to.
+             *
+             * @instance
+             * @member {PodJS.Pod} pod
+             * @memberOf PodJS.Pod#BlockContext
+             */
+            pod : _pod,
+
+            /**
+             * The resource this block is bound to.
+             *
+             * @instance
+             * @member {PodJS.Pod#Resource} resource
+             * @memberOf PodJS.Pod#BlockContext
+             */
+            resource : resource
+        };
+
+        /**
+         * @class PodJS.Pod#Block
+         * @classdesc Abstract Base class for block implementations (provided by pods).
+         *     <p>
+         *     A block is an atomic unit of a script.
+         *     <p>
+         *     New types of blocks are added to the system via pods.
+         *     <p>
+         *     Blocks are attached to {@link PodJS.Pod#Resource}s and can manipulate them.
+         *     <p>
+         *     Blocks also have access to the script and to the environment so they can take global actions.
+         *     <p>
+         *     This is an inner class bound to the Pod superclass that has access to the internal resources of the pod.
+         *     Pod sub-classes should ensure that all created resources extend from the resource
+         *     superclass returned by {@link PodJS.Pod#newBlock}.
+         */
+        var Block = {
+            /**
+             * The BlockContext containing a reference to the resource to which it is bound and
+             * a reference to the script in which it is executing.
+             * 
+             * @instance
+             * @member {PodJS.BlockContext} context
+             * @memberOf PodJS.Pod#Block
+             */
+            context : blockContext,
+
+            /**
+             * Parameters for the instance of this block (these come from the user of the block).
+             *
+             * @instance
+             * @member {object} params
+             * @memberOf PodJS.Pod#Block
+             */
+            params : params,
+
+            /**
+             * Returns true if this block is compatible with the specified resource, or false if not.
+             * <p>
+             * If not compatible, the {@link PodJS.ScriptBuilder} will refuse to attach the block to the resource.
+             * <p>
+             * The default implementation of this method is to return true. Subclasses must override if the block will not work with all
+             * resources.
+             *
+             * @method compatibleWith
+             * @memberOf PodJS.Pod#Block
+             * @param {PodJS.Pod#Resource} resource The resource to check for compatibility.
+             * @return {boolean} True if the block is compatible, or false if not.
+             * @instance
+             */
+            compatibleWith : function(resource) {
+                return true;
+            },
+
+            /**
+             * Gets called by the environment when this block is active.
+             * <p>
+             * Pods are not responsible for calling tick() on their own blocks. That is taken care of by the environment.
+             * <p>
+             * The super-class version of tick() does nothing. Subclasses can optionally override to perform additional actions on each
+             * environment tick.
+             *
+             * @method tick
+             * @memberOf PodJS.Pod#Block
+             * @instance
+             */
+            tick : function() {
+            },
+            
+            /**
+             * Release the system resources associated with this block.
+             * <p>
+             * Sub-classes can optionally override this method, but must always call the super-class to ensure the proper
+             * bookkeeping takes place. Note that blocks will continue to receive ticks until deleted / released.
+             *
+             * @method release
+             * @memberOf PodJS.Pod#Block
+             * @instance
+             */
+            release : function() {
+            }
+        };
+        
+        return Block;
+    };
+    
     /**
      * Called when the environment or an application wishes to create a new resource of the given type.
      * <p>
      * Most Pods also provide convenience methods (e.g. newSprite(...) instead of newResource("sprite", ...) but
      * this method is necessary for reflection-style access.
      * <p>
-     * Superclasses should call the base class version of this method to return the super-object for the resource.
-     * The super-object will be bound to the Pod base class so that it can update the resource registry during the lifecycle
+     * Subclasses should call {@link PodJS.Pod#newResourceClass} to return the constructor for the super-class of the resource.
+     * The constructor will be bound to the Pod base class so that it can update the resource registry during the lifecycle
      * of the resource.
      *
+     * @abstract
      * @method newResource
      * @memberof PodJS.Pod
      * @instance
@@ -347,17 +508,65 @@ PodJS.Pod = function(initParams) {
      * @param {string} resourceName The name of the resource to create. This name must be unique for the type of resource so that
      *     the resource can be later retrieved and, if necessary, deleted.
      * @param {object} [options] Set of parameters to be used when creating the resource.
-     * @returns {PodJS.Pod#Resource} A new resource instance
+     * @returns {PodJS.Pod#Resource} Returns the instance of the resource.
+     * @throws {Error} If the resource type provided was not valid. This checking is handled by {@link PodJS.Pod#newResourceClass}.
+     * @throws {Error} If a resource of this type already exists with the given name. This checking is handled by
+     *     {@link PodJS.Pod#newResourceClass}.
+     */
+    this.newResource = function(resourceType, resourceName, options) {
+        throw new Error('Method is abstract and must be overridden by a subclass.');
+    };
+
+    /**
+     * Called by the concrete Pod class when it wishes to create a new Resource, in order to provide the constructor of the
+     * super-class of the object.
+     * <p>
+     * The constructor will be bound to the Pod base class so that it can update the resource registry during the lifecycle
+     * of the resource.
+     *
+     * @method newResourceClass
+     * @memberof PodJS.Pod
+     * @instance
+     * @param {string} resourceType The type of resource to be created (e.g. "sprite"). Must be one of the resource types
+     *     returned by {@link getResourceTypes}.
+     * @param {string} resourceName The name of the resource to create. This name must be unique for the type of resource so that
+     *     the resource can be later retrieved and, if necessary, deleted.
+     * @param {object} [options] Set of parameters to be used when creating the resource.
+     * @returns {Function} the constructor of the Resource class that the subclass should create a new instance of.
      * @throws {Error} If the resource type provided was not valid.
      * @throws {Error} If a resource of this type already exists with the given name.
      */
-    this.newResource = function(resourceType, resourceName, options) {
+    this.newResourceClass = function(resourceType, resourceName, options) {
         
         // Check that resource type is one of the resource types supported by this pod.
         if (this.getResourceTypes().indexOf(resourceType) === -1) {
             throw new Error("This pod does not know how to create resources of type '" + resourceType + "'");
         }
         
+        /**
+         * @class PodJS.Pod#ResourceContext
+         * @classdesc Context provided to resources that gives them access to the environment and pod.
+         */
+        var resourceContext = {
+            /**
+             * The environment this resource is bound to.
+             *
+             * @instance
+             * @member {PodJS} environment
+             * @memberOf PodJS.Pod#ResourceContext
+             */
+            environment : _environment,
+
+            /**
+             * The pod this resource is bound to.
+             *
+             * @instance
+             * @member {PodJS.Pod} pod
+             * @memberOf PodJS.Pod#ResourceContext
+             */
+            pod : _pod
+        };
+
         /**
          * @class PodJS.Pod#Resource
          * @classdesc Base class for a resource that belongs to a Pod.
@@ -393,6 +602,15 @@ PodJS.Pod = function(initParams) {
              * @instance
              */
             options : options,
+            
+            /**
+             * Context containing references to the environment and pod to which this resource is bound.
+             * 
+             * @type {PodJS.Pod#ResourceContext}
+             * @memberof PodJS.Pod#Resource
+             * @instance
+             */
+            context : resourceContext,
             
             /**
              * Release the system resources associated with this resource and remove it from the pod's resource registry.
