@@ -489,7 +489,7 @@ PodJS.Pod = function(initParams) {
      */
     this.getResourcesByType = function(resourceType) {
         var result = {};
-        if (this.getResourceTypes().indexOf(resourceType) === -1) {
+        if (this.getResourceTypeNames().indexOf(resourceType) === -1) {
             throw new Error("Pod does not support resource type '" + resourceType + "'.");
         }
         if (_resourceRegistry.hasOwnProperty(resourceType)) {
@@ -499,7 +499,7 @@ PodJS.Pod = function(initParams) {
     };
 
     /**
-     * Returns a list of resource types that this Pod provides.
+     * Returns a list of information about resource types that this Pod provides.
      * <p>
      * Note that resource type names must be globally unique across all pods. Pod authors should use the website
      * {@link http://podjs.com/} to register resource type names so there are no conflicts.
@@ -508,10 +508,32 @@ PodJS.Pod = function(initParams) {
      * @method getResourceTypes
      * @memberof PodJS.Pod
      * @instance
-     * @returns {string[]} An array of supported resource types.
+     * @returns {PodJS.ResourceInfo[]} An array of supported resource types.
      */
     this.getResourceTypes = function() {
         throw new Error('Method is abstract and must be overridden by a subclass.');
+    };
+
+    /**
+     * Returns a list of names of resource types supported by this pod.
+     * <p>
+     * This is a convenience method that effectively calls {@link PodJS.Pod#getResourceTypes} and then returns an array of all
+     * resourceType property values of each info object.
+     *
+     * @abstract
+     * @method getResourceTypeNames
+     * @memberof PodJS.Pod
+     * @instance
+     * @returns {string[]} An array of supported resource type names
+     */
+    this.getResourceTypeNames = function() {
+        var result = [];
+        var types = this.getResourceTypes();
+        for (var i = 0; i < types.length; i++) {
+            var info = types[i];
+            result.push(info.resourceType);
+        }
+        return result;
     };
 
     /**
@@ -740,7 +762,7 @@ PodJS.Pod = function(initParams) {
     this.newResourceClass = function(resourceType, resourceName, options) {
         
         // Check that resource type is one of the resource types supported by this pod.
-        if (this.getResourceTypes().indexOf(resourceType) === -1) {
+        if (this.getResourceTypeNames().indexOf(resourceType) === -1) {
             throw new Error("This pod does not know how to create resources of type '" + resourceType + "'");
         }
         
@@ -991,6 +1013,36 @@ PodJS.BlockInfo = {
     compatibleWith : function(resource) {
         return true;
     }
+};
+
+/////////////////////////////////////////////////////////////////////
+// PodJS.ResourceInfo
+
+/**
+ * @static
+ * @class PodJS.ResourceInfo
+ * @classdesc Information about a resource provided by a Pod, including name and description.
+ */
+PodJS.ResourceInfo = {
+    /**
+     * Name of the resource type
+     *
+     * @instance
+     * @type {string}
+     * @member resourceType
+     * @memberOf PodJS.ResourceInfo
+     */
+    resourceType : null,
+    
+    /**
+     * Description of this resource
+     *
+     * @instance
+     * @type {string}
+     * @member description
+     * @memberOf PodJS.ResourceInfo
+     */
+    description : null
 };
 
 } // end browser detect

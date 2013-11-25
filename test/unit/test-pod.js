@@ -153,7 +153,14 @@ PodJSTest.prototype.testPodNewResource = function() {
         PodJS.Pod.call(this, initParams);
         
         this.getResourceTypes = function() {
-            return ["sprite", "stage"];
+            return [
+                {
+                    resourceType : "sprite"
+                },
+                {
+                    resourceType : "stage"
+                }
+            ];
         };
 
         this.newResource = function(resourceType, resourceName, options) {
@@ -354,9 +361,16 @@ PodJSTest.prototype.testScriptBuilder = function() {
         };
         
         this.getResourceTypes = function() {
-            return ["sprite", "stage"];
+            return [
+                {
+                    resourceType : "sprite"
+                },
+                {
+                    resourceType : "stage"
+                }
+            ];
         };
-        
+       
         this.newResource = function(resourceType, resourceName, options) {
             var resourceBase = this.newResourceClass(resourceType, resourceName, options);
             var resource = Object.create(resourceBase);
