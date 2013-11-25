@@ -248,7 +248,16 @@ PodJSTest.prototype.testBlock = function() {
         PodJS.Pod.call(this, initParams);
         
         this.getBlockTypes = function() {
-            return ["sprite_move", "sprite_next_costume"];
+            return [
+                {
+                    blockType : "sprite_move",
+                    description : "Move the sprite"
+                }, 
+                {
+                    blockType : "sprite_next_costume",
+                    description : "Change the sprite to the next costume"
+                }
+            ];
         };
         
         this.newBlock = function(blockType, resource, params) {
@@ -267,7 +276,11 @@ PodJSTest.prototype.testBlock = function() {
     
     // Test getBlockTypes()
     // Note we're really only testing the subclass here since the base class is abstract
-    assertEquals(["sprite_move", "sprite_next_costume"], example.getBlockTypes());
+    var blockTypeList = [];
+    for (var i = 0; i < example.getBlockTypes().length; i++) {
+        blockTypeList.push(example.getBlockTypes()[i].blockType);
+    }
+    assertEquals(["sprite_move", "sprite_next_costume"], blockTypeList);
 
     // Test newBlock()
     var exampleResource = { a : 1 };
@@ -295,5 +308,112 @@ PodJSTest.prototype.testBlock = function() {
         if (e.name === "AssertError") throw e;
         // pass
     }
+};
+
+/////////////////////////////////////////////////////////////
+// Test PodJS.ScriptBuilder and friends
+
+PodJSTest.prototype.testScriptBuilder = function() {
+    // Define ExamplePod
+    var ExamplePod = function(initParams) {
+        PodJS.Pod.call(this, initParams);
+        
+        this.getBlockTypes = function() {
+            return [
+                {
+                    blockType : "sprite_move",
+                    description : "Move the sprite",
+                    parameterInfo : [
+                        { name : "a" }
+                    ],
+                    compatibleWith : function(resource) {
+                        return resource.resourceType === "sprite";
+                    }
+                }, 
+                {
+                    blockType : "sprite_next_costume",
+                    description : "Change the sprite to the next costume",
+                    parameterInfo : [
+                        { name : "a" }
+                    ],
+                    compatibleWith : function(resource) {
+                        return resource.resourceType === "sprite";
+                    }
+                },
+                {
+                    blockType : "stage_next_costume",
+                    description : "Change the stage to the next costume",
+                    parameterInfo : [
+                        { name : "a" }
+                    ],
+                    compatibleWith : function(resource) {
+                        return resource.resourceType === "stage";
+                    }
+                }
+            ];
+        };
+        
+        this.getResourceTypes = function() {
+            return ["sprite", "stage"];
+        };
+        
+        this.newResource = function(resourceType, resourceName, options) {
+            var resourceBase = this.newResourceClass(resourceType, resourceName, options);
+            var resource = Object.create(resourceBase);
+            return resource;
+        };
+
+        this.newBlock = function(blockType, resource, params) {
+            var blockClass = this.newBlockClass(blockType, resource, params);
+            var block = Object.create(blockClass);
+            return block;
+        };
+    };
+    ExamplePod.prototype = Object.create(PodJS.Pod.prototype);
+    ExamplePod.constructor = ExamplePod;
+    PodJS.REGISTER_POD_CLASS("example5", ExamplePod);
+    
+    // Create an environment and pod
+    var env = new PodJS();
+    var pod = env.pod("example5");
+
+    var cat = pod.newResource("sprite", "cat");
+    var stage1 = pod.newResource("stage", "stage1");
+    var scriptBuilder = cat.newScript();
+    assertNotNull(scriptBuilder);
+
+    assertTrue(scriptBuilder.hasOwnProperty("sprite_move"));
+    assertTrue(scriptBuilder.hasOwnProperty("sprite_next_costume"));
+    assertFalse(scriptBuilder.hasOwnProperty("stage_next_costume"));
+    
+    assertEquals(0, scriptBuilder.script.getBlocks().length);
+    
+    scriptBuilder.sprite_move(1);
+    assertEquals(1, scriptBuilder.script.getBlocks().length);
+    assertEquals("sprite_move", scriptBuilder.script.getBlocks()[0].blockType);
+    assertEquals(1, scriptBuilder.script.getBlocks()[0].params[0]);
+    
+    scriptBuilder.sprite_next_costume(2).sprite_move(3);
+    assertEquals(3, scriptBuilder.script.getBlocks().length);
+    assertEquals("sprite_move", scriptBuilder.script.getBlocks()[0].blockType);
+    assertEquals(1, scriptBuilder.script.getBlocks()[0].params[0]);
+    assertEquals("sprite_next_costume", scriptBuilder.script.getBlocks()[1].blockType);
+    assertEquals(2, scriptBuilder.script.getBlocks()[1].params[0]);
+    assertEquals("sprite_move", scriptBuilder.script.getBlocks()[2].blockType);
+    assertEquals(3, scriptBuilder.script.getBlocks()[2].params[0]);
+
+    var scriptBuilder2 = stage1.newScript();
+    assertNotNull(scriptBuilder2);
+
+    assertFalse(scriptBuilder2.hasOwnProperty("sprite_move"));
+    assertFalse(scriptBuilder2.hasOwnProperty("sprite_next_costume"));
+    assertTrue(scriptBuilder2.hasOwnProperty("stage_next_costume"));
+    
+    assertEquals(0, scriptBuilder2.script.getBlocks().length);
+    
+    scriptBuilder2.stage_next_costume(1);
+    assertEquals(1, scriptBuilder2.script.getBlocks().length);
+    assertEquals("stage_next_costume", scriptBuilder2.script.getBlocks()[0].blockType);
+    assertEquals(1, scriptBuilder2.script.getBlocks()[0].params[0]);
 };
 

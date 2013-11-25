@@ -130,6 +130,94 @@ PodJS = function(options) {
         return _pods[name];
     };
 
+    /**
+     * Create a new ScriptBuilder which will build a script attached to the provided resource.
+     * <p>
+     * The ScriptBuilder will be bound to this environment and so the available blocks will come from all pods registered in
+     * this environment.
+     * 
+     * @instance
+     * @method newScriptBuilder
+     * @param {PodJS.Script} script The script to add blocks to (should already be created and bound to its environment and
+     *     resource).
+     * @return {PodJS.ScriptBuilder} The ScriptBuilder that will build the script.
+     * @memberof PodJS.Pod
+     */
+    this.newScriptBuilder = function(script) {
+        /**
+         * @class PodJS.ScriptBuilder
+         * @classdesc Factory class that assembles blocks to form new {@link PodJS.Script}s attached to {@link PodJS.Pod#Resource}s.
+         *     <p>
+         *     Instances of this class can only be created by the environment itself.
+         *     <p>
+         *     The ScriptBuilder, when created, will automatically be populated with instance members that have the same name
+         *     as the blocks registered by all pods in the environment. Those instance members will each return a function that,
+         *     when called, will add a new block of that type to the script and then return the ScriptBuilder so the next block
+         *     in the sequence can be easily added.
+         */
+        var ScriptBuilder = function() {
+            var scriptBuilderThis = this;
+
+            /**
+             * The script this ScriptBuilder is creating
+             *
+             * @instance
+             * @member script
+             * @type {PodJS.Script}
+             * @memberof {PodJS.ScriptBuilder}
+             */
+            this.script = script;
+            
+            var construct = function(script) {
+                for (var podName in _pods) {
+                    if (_pods.hasOwnProperty(podName)) {
+                        var pod = _pods[podName];
+                        var blockTypes = pod.getBlockTypes();
+                        for (var i = 0; i < blockTypes.length; i++) {
+                            var blockInfo = blockTypes[i];
+                            var blockType = blockInfo.blockType;
+                            if (!blockInfo.hasOwnProperty("compatibleWith") || blockInfo.compatibleWith(script.context.resource)) {
+                                var addForBlockType = function(blockType) {
+                                    scriptBuilderThis[blockType] = function() {
+                                        // builder pattern - return instance of the ScriptBuilder.
+                                        // but as a side-effect, add the block to the script
+                                        // 
+                                        // To support parameters, we return a function that, when executed, returns the ScriptBuilder,
+                                        // but modifies the parameters.
+                                        var parameterInfo = blockInfo.parameterInfo;
+                                        if (typeof(parameterInfo) === "undefined" || parameterInfo === null) {
+                                            parameterInfo = [];
+                                        }
+                                        if (parameterInfo.length !== arguments.length) {
+                                            throw new Error("Block is expecting " + parameterInfo.length +
+                                                " parameters, but specified " + arguments.length)
+                                        }
+                                        var block = pod.newBlock(blockType, script.context.resource, arguments);
+                                        script.addBlock(block);
+
+                                        block.params = arguments;
+                                        return this;
+                                    };
+                                };
+                                addForBlockType(blockType);
+                            }
+
+                            // TODO: Improve the syntax of scripts by not requiring () for blocks that don't take parameters.
+                            // This can be done by using Object.defineProperty(this, blockType, { get : function() { ... } })
+                            // so that when the function is retrieved (but not necessarily executed) we can still mutate the script.
+                            // The function, if not called, should also have the same properties as the ScriptBuilder, so the builder
+                            // pattern can continue whether or not the function is executed.
+                        }
+                    }
+                }
+            };
+
+            construct(script);
+        };
+        
+        return new ScriptBuilder();
+    };
+
     // Constructor
     var construct = function(options) {
         _options = options;
@@ -177,9 +265,113 @@ PodJS.REGISTER_POD_CLASS = function(podName, podClass) {
     PodJS.POD_CLASSES[podName] = podClass;
 };
 
+/////////////////////////////////////////////////////////////////////
+// PodJS.ScriptContext
+
+
+/**
+ * @static
+ * @class PodJS.ScriptContext
+ * @classdesc Contains a reference to the environment and resource the script is bound to.
+ * 
+ * @constructor
+ * @desc Constructs a new ScriptContext
+ * @param {PodJS} environment The environment the script is bound to
+ * @param {PodJS.Pod#Resource} resource The resource the script is bound to
+ */
+PodJS.ScriptContext = function(environment, resource) {
+    
+    /**
+     * The environment the script is bound to
+     *
+     * @instance
+     * @member environment
+     * @type {PodJS}
+     * @memberof PodJS.ScriptContext
+     */
+    this.environment = environment;
+    
+    /**
+     * The resource the script is bound to
+     *
+     * @instance
+     * @member resource
+     * @type {PodJS.Pod#Resource}
+     * @memberof PodJS.ScriptContext
+     */
+    this.resource = resource;
+};
+
 
 /////////////////////////////////////////////////////////////////////
-// Pod
+// PodJS.Script
+
+
+/**
+ * @static
+ * @class PodJS.Script
+ * @classdesc Executable sequence of blocks that is associated with a resource.
+ * 
+ * @constructor
+ * @desc Constructs a new Script bound to the environment and resource provided in the given context object.
+ * @param {PodJS.ScriptContext} context containing the environment and resource this script is bound to.
+ */
+PodJS.Script = function(context) {
+    
+    /**
+     * The context, containing a reference to the environment and resource the script is bound to.
+     *
+     * @instance
+     * @member context
+     * @type {PodJS.ScriptContext}
+     * @memberof PodJS.Script
+     */
+    this.context = context;
+    
+    /**
+     * The sequence of blocks present in this script.
+     * 
+     * @instance
+     * @private
+     * @type {PodJS.Resource#Block[]}
+     * @memberof PodJS.Script
+     */
+    var _blocks = [];
+
+    /**
+     * Adds the given block to the end of the script.
+     *
+     * @instance
+     * @method addBlock
+     * @memberof PodJS.Script
+     * @param {PodJS.Pod#Block} block The instance of the block to add.
+     */
+    this.addBlock = function(block) {
+        _blocks.push(block);
+    };
+    
+    /**
+     * Returns a clone of the sequence of blocks present in this script.
+     * <p>
+     * A clone is returned so the caller cannot accidentally mutate the script without the script being aware.
+     *
+     * @instance
+     * @method getBlocks
+     * @memberof PodJS.Script
+     * @return {PodJS.Resource#Block[]} A clone of the sequence of blocks
+     */
+    this.getBlocks = function() {
+        var result = [];
+        for (var i = 0; i < _blocks.length; i++) {
+            result.push(_blocks[i]);
+        }
+        return result;
+    };
+};
+    
+
+/////////////////////////////////////////////////////////////////////
+// PodJS.Pod
 
 /**
  * @static
@@ -257,7 +449,7 @@ PodJS.Pod = function(initParams) {
      * @method getBlockTypes
      * @memberof PodJS.Pod
      * @instance
-     * @returns {string[]} An array of supported block types.
+     * @returns {PodJS.BlockInfo[]} An array of supported block types.
      */
     this.getBlockTypes = function() {
         throw new Error('Method is abstract and must be overridden by a subclass.');
@@ -360,14 +552,32 @@ PodJS.Pod = function(initParams) {
      * @param {string} blockType The type of block to be created (e.g. "gotoXY"). Must be one of the block types
      *     returned by {@link PodJS.Pod#getBlockTypes}.
      * @param {PodJS.Block#Resource} resource The resource this block is to be bound to.
-     * @param {object} [params] Set of parameters to be used when creating the block (provided by the user).
+     * @param {object} [params] List of parameters to be used when creating the block (provided by the user).
      * @returns {Function} The constructor of the Block class that the subclass should create a new instance of.
      * @throws {Error} If the block type provided was not one of the valid block types returned by {@link PodJS.Pod#getBlockTypes}.
      */
     this.newBlockClass = function(blockType, resource, params) {
         // Check that block type is one of the block types supported by this pod.
-        if (this.getBlockTypes().indexOf(blockType) === -1) {
+        var found = null;
+        for (var i = 0; i < this.getBlockTypes().length; i++) {
+            var blockInfo = this.getBlockTypes()[i];
+            if (blockInfo.blockType === blockType) {
+                found = blockInfo;
+                break;
+            }
+        }
+        if (found === null) {
             throw new Error("This pod does not know how to create blocks of type '" + blockType + "'");
+        }
+        
+        // Check that the block is compatible with the resource
+        if (blockInfo.hasOwnProperty("compatibleWith") && !blockInfo.compatibleWith(resource)) {
+            throw new Error("Block '" + blockType + "' is not compatible with specified resource of type '" +
+                resource.resourceType + "'");
+        }
+        
+        if (typeof(params) === "undefined" || params === null) {
+            params = [];
         }
         
         /**
@@ -421,6 +631,15 @@ PodJS.Pod = function(initParams) {
          */
         var Block = {
             /**
+             * The name of the type of block this is an instance of.
+             * 
+             * @instance
+             * @member {string} blockType
+             * @memberOf PodJS.Pod#Block
+             */
+            blockType : blockType,
+
+            /**
              * The BlockContext containing a reference to the resource to which it is bound and
              * a reference to the script in which it is executing.
              * 
@@ -438,24 +657,6 @@ PodJS.Pod = function(initParams) {
              * @memberOf PodJS.Pod#Block
              */
             params : params,
-
-            /**
-             * Returns true if this block is compatible with the specified resource, or false if not.
-             * <p>
-             * If not compatible, the {@link PodJS.ScriptBuilder} will refuse to attach the block to the resource.
-             * <p>
-             * The default implementation of this method is to return true. Subclasses must override if the block will not work with all
-             * resources.
-             *
-             * @method compatibleWith
-             * @memberOf PodJS.Pod#Block
-             * @param {PodJS.Pod#Resource} resource The resource to check for compatibility.
-             * @return {boolean} True if the block is compatible, or false if not.
-             * @instance
-             */
-            compatibleWith : function(resource) {
-                return true;
-            },
 
             /**
              * Gets called by the environment when this block is active.
@@ -602,7 +803,7 @@ PodJS.Pod = function(initParams) {
              * @instance
              */
             options : options,
-            
+
             /**
              * Context containing references to the environment and pod to which this resource is bound.
              * 
@@ -611,6 +812,30 @@ PodJS.Pod = function(initParams) {
              * @instance
              */
             context : resourceContext,
+            
+            /**
+             * Scripts associated with this resource.
+             * 
+             * @type {PodJS.Script[]}
+             * @memberof PodJS.Pod#Resource
+             * @instance
+             */
+            scripts : [],
+            
+            /**
+             * Create a new {@link PodJS.ScriptBuilder} which will build a script attached to this resource.
+             * 
+             * @method newScript
+             * @return {PodJS.ScriptBuilder} The ScriptBuilder that will build the script.
+             * @memberof PodJS.Pod#Resource
+             * @instance
+             */
+            newScript : function() {
+                var scriptContext = new PodJS.ScriptContext(this.context.environment, this);
+                var script = new PodJS.Script(scriptContext);
+                this.scripts.push(script);
+                return _environment.newScriptBuilder(script);
+            },
             
             /**
              * Release the system resources associated with this resource and remove it from the pod's resource registry.
@@ -675,6 +900,97 @@ PodJS.Pod = function(initParams) {
 
     construct();
 };
+
+/////////////////////////////////////////////////////////////////////
+// PodJS.BlockInfo.ParameterInfo
+
+/**
+ * @static
+ * @class PodJS.BlockInfo.ParameterInfo
+ * @classdesc Information about a parameter provided to a block.
+ */
+PodJS.BlockInfo.ParameterInfo = {
+    /**
+     * Name of the parameter
+     *
+     * @instance
+     * @type {string}
+     * @member name
+     * @memberOf PodJS.BlockInfo.ParameterInfo
+     */
+    name : null,
     
+    /**
+     * Description of this parameter
+     *
+     * @instance
+     * @type {string}
+     * @member description
+     * @memberOf PodJS.BlockInfo.ParameterInfo
+     */
+    description : null
+};
+
+
+/////////////////////////////////////////////////////////////////////
+// PodJS.BlockInfo
+
+/**
+ * @static
+ * @class PodJS.BlockInfo
+ * @classdesc Information about a block provided by a Pod, including which resource types it is compatible with and
+ *     what parameters are accepted. Note that the object provided does not have to extend from this object - it must merely
+ *     have the same properties.
+ */
+PodJS.BlockInfo = {
+    /**
+     * Name of the block type
+     *
+     * @instance
+     * @type {string}
+     * @member blockType
+     * @memberOf PodJS.BlockInfo
+     */
+    blockType : null,
+    
+    /**
+     * Description of this block
+     *
+     * @instance
+     * @type {string}
+     * @member description
+     * @memberOf PodJS.BlockInfo
+     */
+    description : null,
+    
+    /**
+     * Description of Ordered list of parameters accepted by this block. If this property is not present, it is assumed the
+     * block requires no parameters.
+     *
+     * @instance
+     * @type {PodJS.BlockInfo.ParameterInfo[]}
+     * @member parameterInfo
+     * @memberOf PodJS.BlockInfo
+     */
+    parameterInfo : [],
+    
+    /**
+     * Returns true if this block is compatible with the specified resource, or false if not.
+     * <p>
+     * If not compatible, the {@link PodJS.ScriptBuilder} will refuse to attach the block to the resource.
+     * <p>
+     * The default implementation of this method is to return true. Subclasses must override if the block will not work with all
+     * resources. If an object is provided with no compatibleWith method, it is assumed the block is compatible with all resources.
+     *
+     * @method compatibleWith
+     * @memberOf PodJS.BlockInfo
+     * @param {PodJS.Pod#Resource} resource The resource to check for compatibility.
+     * @return {boolean} True if the block is compatible, or false if not.
+     * @instance
+     */
+    compatibleWith : function(resource) {
+        return true;
+    }
+};
 
 } // end browser detect
