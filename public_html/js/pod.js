@@ -69,6 +69,8 @@ if (/MSIE (\d+\.\d+);/.test(navigator.userAgent)) {
  *     </table>
  */
 PodJS = function(options) {
+    var podJSThis = this;
+
     /**
      * Options provided when this environment was created.
      *
@@ -175,9 +177,9 @@ PodJS = function(options) {
                         var blockTypes = pod.getBlockTypes();
                         for (var i = 0; i < blockTypes.length; i++) {
                             var blockInfo = blockTypes[i];
-                            var blockType = blockInfo.blockType;
                             if (!blockInfo.hasOwnProperty("compatibleWith") || blockInfo.compatibleWith(script.context.resource)) {
-                                var addForBlockType = function(blockType) {
+                                var addForBlockType = function(pod, blockInfo) {
+                                    var blockType = blockInfo.blockType;
                                     scriptBuilderThis[blockType] = function() {
                                         // builder pattern - return instance of the ScriptBuilder.
                                         // but as a side-effect, add the block to the script
@@ -189,8 +191,8 @@ PodJS = function(options) {
                                             parameterInfo = [];
                                         }
                                         if (parameterInfo.length !== arguments.length) {
-                                            throw new Error("Block is expecting " + parameterInfo.length +
-                                                " parameters, but specified " + arguments.length)
+                                            throw new Error("Block '" + blockType + "' is expecting " + parameterInfo.length +
+                                                " parameters, but specified " + arguments.length);
                                         }
                                         var block = pod.newBlock(blockType, script.context.resource, arguments);
                                         script.addBlock(block);
@@ -199,7 +201,7 @@ PodJS = function(options) {
                                         return this;
                                     };
                                 };
-                                addForBlockType(blockType);
+                                addForBlockType(pod, blockInfo);
                             }
 
                             // TODO: Improve the syntax of scripts by not requiring () for blocks that don't take parameters.
@@ -221,6 +223,9 @@ PodJS = function(options) {
     // Constructor
     var construct = function(options) {
         _options = options;
+        
+        // Always load core pod
+        podJSThis.pod("core");
     };
 
     construct(options);
@@ -1045,5 +1050,53 @@ PodJS.ResourceInfo = {
      */
     description : null
 };
+
+
+/////////////////////////////////////////////////////////////////////
+// Core library
+
+var CorePod = function(initParams) {
+    PodJS.Pod.call(this, initParams);
+
+    this.getBlockTypes = function() {
+        return [
+            {
+                blockType : "begin",
+                description : "Delineates the start of a new group of blocks.",
+                parameterInfo : [],
+                compatibleWith : function(resource) {
+                    return true;
+                }
+            },
+            {
+                blockType : "end",
+                description : "Delineates the end of a new group of blocks.",
+                parameterInfo : [],
+                compatibleWith : function(resource) {
+                    return true;
+                }
+            }
+        ];
+    };
+
+    this.getResourceTypes = function() {
+        return [];
+    };
+
+    this.newResource = function(resourceType, resourceName, options) {
+        var resourceBase = this.newResourceClass(resourceType, resourceName, options);
+        var resource = Object.create(resourceBase);
+        return resource;
+    };
+
+    this.newBlock = function(blockType, resource, params) {
+        var blockClass = this.newBlockClass(blockType, resource, params);
+        var block = Object.create(blockClass);
+        return block;
+    };
+};
+CorePod.prototype = Object.create(PodJS.Pod.prototype);
+CorePod.constructor = CorePod;
+PodJS.REGISTER_POD_CLASS("core", CorePod);
 
 } // end browser detect
