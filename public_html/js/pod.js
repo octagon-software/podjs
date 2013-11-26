@@ -923,36 +923,6 @@ PodJS.Pod = function(initParams) {
     construct();
 };
 
-/////////////////////////////////////////////////////////////////////
-// PodJS.BlockInfo.ParameterInfo
-
-/**
- * @static
- * @class PodJS.BlockInfo.ParameterInfo
- * @classdesc Information about a parameter provided to a block.
- */
-PodJS.BlockInfo.ParameterInfo = {
-    /**
-     * Name of the parameter
-     *
-     * @instance
-     * @type {string}
-     * @member name
-     * @memberOf PodJS.BlockInfo.ParameterInfo
-     */
-    name : null,
-    
-    /**
-     * Description of this parameter
-     *
-     * @instance
-     * @type {string}
-     * @member description
-     * @memberOf PodJS.BlockInfo.ParameterInfo
-     */
-    description : null
-};
-
 
 /////////////////////////////////////////////////////////////////////
 // PodJS.BlockInfo
@@ -1013,6 +983,37 @@ PodJS.BlockInfo = {
     compatibleWith : function(resource) {
         return true;
     }
+};
+
+
+/////////////////////////////////////////////////////////////////////
+// PodJS.BlockInfo.ParameterInfo
+
+/**
+ * @static
+ * @class PodJS.BlockInfo.ParameterInfo
+ * @classdesc Information about a parameter provided to a block.
+ */
+PodJS.BlockInfo.ParameterInfo = {
+    /**
+     * Name of the parameter
+     *
+     * @instance
+     * @type {string}
+     * @member name
+     * @memberOf PodJS.BlockInfo.ParameterInfo
+     */
+    name : null,
+    
+    /**
+     * Description of this parameter
+     *
+     * @instance
+     * @type {string}
+     * @member description
+     * @memberOf PodJS.BlockInfo.ParameterInfo
+     */
+    description : null
 };
 
 /////////////////////////////////////////////////////////////////////
