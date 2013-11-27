@@ -24,7 +24,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-PodJSTest = TestCase("PodJS");
+var PodJSTest = TestCase("PodJSTest");
 
 PodJSTest.prototype.test_POD_CLASSES = function() {
     assertTrue(typeof(PodJS.POD_CLASSES) !== "undefined");
