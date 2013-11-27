@@ -170,6 +170,31 @@ PodJS = function(options) {
              */
             this.script = script;
             
+            /**
+             * Add a constant block to the script. A constant block is a special-purpose block that takes a parameter and
+             * always uses that parameter. Note that, as the name implies, the value of this block is evaluated at script
+             * creation time but is not re-evaluated in the future.
+             * 
+             * @instance
+             * @method constant
+             * @param {number|string} value The value to specify as a constant.
+             * @return {PodJS.ScriptBuilder} The builder, so additional blocks can be chained.
+             * @memberof {PodJS.ScriptBuilder}
+             */
+            this.c = function(value) {
+                if (typeof(value) !== "number" && typeof(value) !== "string") {
+                    throw new Error("For block 'constant', parameter must be a number or string.");
+                }
+                
+                var blockContext = {
+                    environment : script.context.environment,
+                    pod : null, // core block is not associated with any pod.
+                    resource : script.context.resource
+                };
+                script.addBlock(new PodJS.ConstantBlock(blockContext, value));
+                return scriptBuilderThis;
+            };
+            
             var construct = function(script) {
                 for (var podName in _pods) {
                     if (_pods.hasOwnProperty(podName)) {
@@ -180,35 +205,17 @@ PodJS = function(options) {
                             if (!blockInfo.hasOwnProperty("compatibleWith") || blockInfo.compatibleWith(script.context.resource)) {
                                 var addForBlockType = function(pod, blockInfo) {
                                     var blockType = blockInfo.blockType;
-                                    scriptBuilderThis[blockType] = function() {
+                                    
+                                    Object.defineProperty(scriptBuilderThis, blockType, { get : function() {
                                         // builder pattern - return instance of the ScriptBuilder.
                                         // but as a side-effect, add the block to the script
-                                        // 
-                                        // To support parameters, we return a function that, when executed, returns the ScriptBuilder,
-                                        // but modifies the parameters.
-                                        var parameterInfo = blockInfo.parameterInfo;
-                                        if (typeof(parameterInfo) === "undefined" || parameterInfo === null) {
-                                            parameterInfo = [];
-                                        }
-                                        if (parameterInfo.length !== arguments.length) {
-                                            throw new Error("Block '" + blockType + "' is expecting " + parameterInfo.length +
-                                                " parameters, but specified " + arguments.length);
-                                        }
                                         var block = pod.newBlock(blockType, script.context.resource, arguments);
                                         script.addBlock(block);
-
-                                        block.params = arguments;
-                                        return this;
-                                    };
+                                        return scriptBuilderThis;
+                                    } });
                                 };
                                 addForBlockType(pod, blockInfo);
                             }
-
-                            // TODO: Improve the syntax of scripts by not requiring () for blocks that don't take parameters.
-                            // This can be done by using Object.defineProperty(this, blockType, { get : function() { ... } })
-                            // so that when the function is retrieved (but not necessarily executed) we can still mutate the script.
-                            // The function, if not called, should also have the same properties as the ScriptBuilder, so the builder
-                            // pattern can continue whether or not the function is executed.
                         }
                     }
                 }
@@ -555,14 +562,13 @@ PodJS.Pod = function(initParams) {
      * @param {string} blockType The type of block to be created (e.g. "gotoXY"). Must be one of the block types
      *     returned by {@link PodJS.Pod#getBlockTypes}.
      * @param {PodJS.Block#Resource} resource The resource this block is to be bound to.
-     * @param {object} [params] Set of parameters to be used when creating the block (provided by the user).
      * @returns {PodJS.Pod#Block} The instance of the block.
      * @throws {Error} If the block type provided was not one of the valid block types returned by {@link PodJS.Pod#getBlockTypes}.
      *     This check is performed by {@link PodJS.Pod#newBlockClass}.
      * @throws {Error} If the block to be returned would not be compatible with the resource provided. This check
      *     must be performed by the subclass.
      */
-    this.newBlock = function(blockType, resource, params) {
+    this.newBlock = function(blockType, resource) {
         throw new Error('Method is abstract and must be overridden by a subclass.');
     };
 
@@ -579,11 +585,10 @@ PodJS.Pod = function(initParams) {
      * @param {string} blockType The type of block to be created (e.g. "gotoXY"). Must be one of the block types
      *     returned by {@link PodJS.Pod#getBlockTypes}.
      * @param {PodJS.Block#Resource} resource The resource this block is to be bound to.
-     * @param {object} [params] List of parameters to be used when creating the block (provided by the user).
      * @returns {Function} The constructor of the Block class that the subclass should create a new instance of.
      * @throws {Error} If the block type provided was not one of the valid block types returned by {@link PodJS.Pod#getBlockTypes}.
      */
-    this.newBlockClass = function(blockType, resource, params) {
+    this.newBlockClass = function(blockType, resource) {
         // Check that block type is one of the block types supported by this pod.
         var found = null;
         for (var i = 0; i < this.getBlockTypes().length; i++) {
@@ -601,10 +606,6 @@ PodJS.Pod = function(initParams) {
         if (blockInfo.hasOwnProperty("compatibleWith") && !blockInfo.compatibleWith(resource)) {
             throw new Error("Block '" + blockType + "' is not compatible with specified resource of type '" +
                 resource.resourceType + "'");
-        }
-        
-        if (typeof(params) === "undefined" || params === null) {
-            params = [];
         }
         
         /**
@@ -675,15 +676,6 @@ PodJS.Pod = function(initParams) {
              * @memberOf PodJS.Pod#Block
              */
             context : blockContext,
-
-            /**
-             * Parameters for the instance of this block (these come from the user of the block).
-             *
-             * @instance
-             * @member {object} params
-             * @memberOf PodJS.Pod#Block
-             */
-            params : params,
 
             /**
              * Gets called by the environment when this block is active.
@@ -930,6 +922,17 @@ PodJS.Pod = function(initParams) {
 
 
 /////////////////////////////////////////////////////////////////////
+// PodJS.ConstantBlock
+
+PodJS.ConstantBlock = function(blockContext, value) {
+    this.blockType = "constant";
+    this.context = blockContext;
+    this.value = value;
+    this.tick = function() {};
+    this.release = function() {};
+};
+
+/////////////////////////////////////////////////////////////////////
 // PodJS.BlockInfo
 
 /**
@@ -1089,8 +1092,8 @@ var CorePod = function(initParams) {
         return resource;
     };
 
-    this.newBlock = function(blockType, resource, params) {
-        var blockClass = this.newBlockClass(blockType, resource, params);
+    this.newBlock = function(blockType, resource) {
+        var blockClass = this.newBlockClass(blockType, resource);
         var block = Object.create(blockClass);
         return block;
     };
