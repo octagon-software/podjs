@@ -167,6 +167,7 @@ PodJSTest.prototype.testPodNewResource = function() {
             var resourceBase = this.newResourceClass(resourceType, resourceName, options);
             var resource = Object.create(resourceBase);
             // normally we'd extend this class to add additional functionality.
+            resource.register(resource);
             return resource;
         };
     };
@@ -374,6 +375,7 @@ PodJSTest.prototype.testScriptBuilder = function() {
         this.newResource = function(resourceType, resourceName, options) {
             var resourceBase = this.newResourceClass(resourceType, resourceName, options);
             var resource = Object.create(resourceBase);
+            resource.register(resource);
             return resource;
         };
 
@@ -400,26 +402,26 @@ PodJSTest.prototype.testScriptBuilder = function() {
     assertTrue(scriptBuilder.hasOwnProperty("sprite_next_costume"));
     assertFalse(scriptBuilder.hasOwnProperty("stage_next_costume"));
     
-    assertEquals(0, scriptBuilder.script.getBlocks().length);
+    assertEquals(0, scriptBuilder.blockScript.getBlocks().length);
     
     scriptBuilder.sprite_move;
-    assertEquals(1, scriptBuilder.script.getBlocks().length);
-    assertEquals("sprite_move", scriptBuilder.script.getBlocks()[0].blockType);
+    assertEquals(1, scriptBuilder.blockScript.getBlocks().length);
+    assertEquals("sprite_move", scriptBuilder.blockScript.getBlocks()[0].blockType);
     
     scriptBuilder.c(1);
-    assertEquals(2, scriptBuilder.script.getBlocks().length);
-    assertEquals("sprite_move", scriptBuilder.script.getBlocks()[0].blockType);
-    assertEquals("constant", scriptBuilder.script.getBlocks()[1].blockType);
-    assertEquals(1, scriptBuilder.script.getBlocks()[1].value);
+    assertEquals(2, scriptBuilder.blockScript.getBlocks().length);
+    assertEquals("sprite_move", scriptBuilder.blockScript.getBlocks()[0].blockType);
+    assertEquals("constant", scriptBuilder.blockScript.getBlocks()[1].blockType);
+    assertEquals(1, scriptBuilder.blockScript.getBlocks()[1].value);
     
     scriptBuilder.sprite_next_costume.c(2).sprite_move.c(3);
-    assertEquals(6, scriptBuilder.script.getBlocks().length);
-    assertEquals("sprite_next_costume", scriptBuilder.script.getBlocks()[2].blockType);
-    assertEquals("constant", scriptBuilder.script.getBlocks()[3].blockType);
-    assertEquals(2, scriptBuilder.script.getBlocks()[3].value);
-    assertEquals("sprite_move", scriptBuilder.script.getBlocks()[4].blockType);
-    assertEquals("constant", scriptBuilder.script.getBlocks()[5].blockType);
-    assertEquals(3, scriptBuilder.script.getBlocks()[5].value);
+    assertEquals(6, scriptBuilder.blockScript.getBlocks().length);
+    assertEquals("sprite_next_costume", scriptBuilder.blockScript.getBlocks()[2].blockType);
+    assertEquals("constant", scriptBuilder.blockScript.getBlocks()[3].blockType);
+    assertEquals(2, scriptBuilder.blockScript.getBlocks()[3].value);
+    assertEquals("sprite_move", scriptBuilder.blockScript.getBlocks()[4].blockType);
+    assertEquals("constant", scriptBuilder.blockScript.getBlocks()[5].blockType);
+    assertEquals(3, scriptBuilder.blockScript.getBlocks()[5].value);
 
     var scriptBuilder2 = stage1.newScript();
     assertNotNull(scriptBuilder2);
@@ -428,12 +430,12 @@ PodJSTest.prototype.testScriptBuilder = function() {
     assertFalse(scriptBuilder2.hasOwnProperty("sprite_next_costume"));
     assertTrue(scriptBuilder2.hasOwnProperty("stage_next_costume"));
     
-    assertEquals(0, scriptBuilder2.script.getBlocks().length);
+    assertEquals(0, scriptBuilder2.blockScript.getBlocks().length);
     
     scriptBuilder2.stage_next_costume.c(1);
-    assertEquals(2, scriptBuilder2.script.getBlocks().length);
-    assertEquals("stage_next_costume", scriptBuilder2.script.getBlocks()[0].blockType);
-    assertEquals("constant", scriptBuilder2.script.getBlocks()[1].blockType);
-    assertEquals(1, scriptBuilder2.script.getBlocks()[1].value);
+    assertEquals(2, scriptBuilder2.blockScript.getBlocks().length);
+    assertEquals("stage_next_costume", scriptBuilder2.blockScript.getBlocks()[0].blockType);
+    assertEquals("constant", scriptBuilder2.blockScript.getBlocks()[1].blockType);
+    assertEquals(1, scriptBuilder2.blockScript.getBlocks()[1].value);
 };
 

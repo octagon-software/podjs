@@ -63,7 +63,7 @@ if (/MSIE (\d+\.\d+);/.test(navigator.userAgent)) {
  *         <td>fps</td>
  *         <td>int</td>
  *         <td>&lt;optional&gt;</td>
- *         <td>60</td>
+ *         <td>30</td>
  *         <td>Frames per second the ticks should ideally run.</td>
  *       </tr>
  *     </table>
@@ -126,6 +126,11 @@ PodJS = function(options) {
             var podClass = PodJS.POD_CLASSES[name];
             var initParams = new PodJS.PodInitParams();
             initParams.env = this;
+            for (var name in _options) {
+                if (_options.hasOwnProperty(name)) {
+                    initParams[name] = _options[name];
+                }
+            }
             var podInstance = new podClass.constructor(initParams);
             _pods[name] = podInstance;
         }
@@ -140,12 +145,12 @@ PodJS = function(options) {
      * 
      * @instance
      * @method newScriptBuilder
-     * @param {PodJS.Script} script The script to add blocks to (should already be created and bound to its environment and
+     * @param {PodJS.Script} blockScript The script to add blocks to (should already be created and bound to its environment and
      *     resource).
      * @return {PodJS.ScriptBuilder} The ScriptBuilder that will build the script.
      * @memberof PodJS.Pod
      */
-    this.newScriptBuilder = function(script) {
+    this.newScriptBuilder = function(blockScript) {
         /**
          * @class PodJS.ScriptBuilder
          * @classdesc Factory class that assembles blocks to form new {@link PodJS.Script}s attached to {@link PodJS.Pod#Resource}s.
@@ -164,11 +169,11 @@ PodJS = function(options) {
              * The script this ScriptBuilder is creating
              *
              * @instance
-             * @member script
+             * @member blockScript
              * @type {PodJS.Script}
              * @memberof {PodJS.ScriptBuilder}
              */
-            this.script = script;
+            this.blockScript = blockScript;
             
             /**
              * Add a constant block to the script. A constant block is a special-purpose block that takes a parameter and
@@ -187,30 +192,36 @@ PodJS = function(options) {
                 }
                 
                 var blockContext = {
-                    environment : script.context.environment,
+                    environment : blockScript.context.environment,
                     pod : null, // core block is not associated with any pod.
-                    resource : script.context.resource
+                    resource : blockScript.context.resource,
+                    blockScript : blockScript,
+                    block : null
                 };
-                script.addBlock(new PodJS.ConstantBlock(blockContext, value));
+                var constantBlock = new PodJS.ConstantBlock(blockContext, value);
+                blockContext.block = constantBlock;
+                blockScript.addBlock(constantBlock);
                 return scriptBuilderThis;
             };
             
-            var construct = function(script) {
+            var construct = function(blockScript) {
                 for (var podName in _pods) {
                     if (_pods.hasOwnProperty(podName)) {
                         var pod = _pods[podName];
                         var blockTypes = pod.getBlockTypes();
                         for (var i = 0; i < blockTypes.length; i++) {
                             var blockInfo = blockTypes[i];
-                            if (!blockInfo.hasOwnProperty("compatibleWith") || blockInfo.compatibleWith(script.context.resource)) {
+                            if (!blockInfo.hasOwnProperty("compatibleWith") ||
+                                blockInfo.compatibleWith(blockScript.context.resource))
+                            {
                                 var addForBlockType = function(pod, blockInfo) {
                                     var blockType = blockInfo.blockType;
                                     
                                     Object.defineProperty(scriptBuilderThis, blockType, { get : function() {
                                         // builder pattern - return instance of the ScriptBuilder.
                                         // but as a side-effect, add the block to the script
-                                        var block = pod.newBlock(blockType, script.context.resource, arguments);
-                                        script.addBlock(block);
+                                        var block = pod.newBlock(blockType, blockScript.context.resource, blockScript);
+                                        blockScript.addBlock(block);
                                         return scriptBuilderThis;
                                     } });
                                 };
@@ -221,10 +232,54 @@ PodJS = function(options) {
                 }
             };
 
-            construct(script);
+            construct(blockScript);
         };
         
         return new ScriptBuilder();
+    };
+
+    /**
+     * Called at approximately 30 frames per second to animate all resources.
+     * <p>
+     * This calls tick on each registered pod, resource and script.
+     *
+     * @method tick
+     * @memberof PodJS
+     * @instance
+     */
+    this.tick = function() {
+        for (var name in _pods) {
+            if (_pods.hasOwnProperty(name)) {
+                var pod = _pods[name];
+                
+                // first, tick all resources in that pod
+                var resources = pod.getAllResources();
+                for (var resType in resources) {
+                    if (resources.hasOwnProperty(resType)) {
+                        var resourceByType = resources[resType];
+                        
+                        for (var resName in resourceByType) {
+                            if (resourceByType.hasOwnProperty(resName)) {
+                                var resource = resourceByType[resName];
+
+                                // first, tick all scripts attached to that resource
+                                var scripts = resource.scripts;
+                                for (var i = 0; i < scripts.length; i++) {
+                                    var script = scripts[i];
+                                    script.tick();
+                                }
+                                
+                                // next, tick the resource itself.
+                                resource.tick();
+                            }
+                        }
+                    }
+                }
+                
+                // next, tick the pod itself
+                pod.tick();
+            }
+        }
     };
 
     // Constructor
@@ -233,12 +288,15 @@ PodJS = function(options) {
         
         // Always load core pod
         podJSThis.pod("core");
+        
+        // Start the timer right away.
+        setInterval(podJSThis.tick, 1000 / 30);
     };
 
     construct(options);
 };
 
-
+    
 /**
  * @class PodJS.PodInitParams
  * @classdesc Initialization parameters for pods. An instance of this object is provided to the pod at construction time.
@@ -339,7 +397,40 @@ PodJS.Script = function(context) {
      * @memberof PodJS.Script
      */
     this.context = context;
+
+    /**
+     * The instruction pointer to which block number is next to be executed.
+     *
+     * @instance
+     * @member index
+     * @type {number}
+     * @memberof PodJS.Script
+     */
+    this.index = 0;
     
+    /**
+     * Stack of instruction pointers for begin / end pairs.
+     *
+     * @instance
+     * @member ipStack
+     * @type {number}
+     * @memberof PodJS.Script
+     */
+    this.ipStack = [];
+    
+    /**
+     * Mechanism that allows a block to signal that the script is ready to yield because enough was done for this tick.
+     * <p>
+     * Before each script tick, yield is set to false and blocks are executed until one block sets yield to true. At that point,
+     * the next instruction will be executed in the next cycle.
+     *
+     * @instance
+     * @member yield
+     * @type {boolean}
+     * @memberof PodJS.Script
+     */
+    this.yield = false;
+
     /**
      * The sequence of blocks present in this script.
      * 
@@ -378,6 +469,78 @@ PodJS.Script = function(context) {
             result.push(_blocks[i]);
         }
         return result;
+    };
+
+    /**
+     * Advances the instruction pointer to the next block
+     *
+     * @instance
+     * @method nextBlock
+     * @memberof PodJS.Script
+     */
+    this.nextBlock = function() {
+        this.index++;
+    };
+
+    /**
+     * Pushes the current instruction pointer to the stack (usually done just before a loop).
+     *
+     * @instance
+     * @method pushIP
+     * @memberof PodJS.Script
+     */
+    this.pushIP = function() {
+        this.ipStack.push(this.index);
+    };
+
+    /**
+     * Pops the current instruction pointer from the stack (usually done at the end of a loop).
+     *
+     * @instance
+     * @method popIP
+     * @memberof PodJS.Script
+     */
+    this.popIP = function() {
+        this.index = this.ipStack.pop();
+    };
+
+    // TODO: validate method
+
+    /**
+     * Read the next block as an argument. Note the block might be composite, causing additional blocks to be read
+     * (e.g. in the case of something like add.c(1).c(2)). This method is typically called by a block implementation.
+     *
+     * @instance
+     * @method nextArgument
+     * @return {string|number} A constant value to be interpreted by the block
+     * @memberof PodJS.Script
+     */
+    this.nextArgument = function() {
+        this.index++;
+        if (this.index < _blocks.length) {
+            var block = _blocks[this.index];
+            if (!block.blockInfo.returnsValue) {
+                throw new Error("Expecting a block that returns a value but got '" + block.blockType + "'");
+            }
+            return block.tick();
+        }
+    };
+
+    /**
+     * Gets called by the environment when this script is active.
+     * <p>
+     * Pods are not responsible for calling tick() on their own scripts. That is taken care of by the environment.
+     *
+     * @method tick
+     * @memberOf PodJS.Script
+     * @instance
+     */
+    this.tick = function() {
+        this.yield = false;
+        while (!this.yield && this.index < _blocks.length) {
+            var block = _blocks[this.index];
+            block.tick();
+        }
     };
 };
     
@@ -511,6 +674,20 @@ PodJS.Pod = function(initParams) {
     };
 
     /**
+     * Returns an object containing a list of all registered resources, keyed by type.
+     * <p>
+     * This method is the most efficient way to enumerate all resources.
+     *
+     * @method getAllResources
+     * @memberof PodJS.Pod
+     * @instance
+     * @returns {object} Map of resource type to all resources registered to this pod of that type.
+     */
+    this.getAllResources = function() {
+        return _resourceRegistry;
+    };
+
+    /**
      * Returns a list of information about resource types that this Pod provides.
      * <p>
      * Note that resource type names must be globally unique across all pods. Pod authors should use the website
@@ -562,13 +739,14 @@ PodJS.Pod = function(initParams) {
      * @param {string} blockType The type of block to be created (e.g. "gotoXY"). Must be one of the block types
      *     returned by {@link PodJS.Pod#getBlockTypes}.
      * @param {PodJS.Block#Resource} resource The resource this block is to be bound to.
+     * @param {PodJS.Script} script The script this block is to be bound to.
      * @returns {PodJS.Pod#Block} The instance of the block.
      * @throws {Error} If the block type provided was not one of the valid block types returned by {@link PodJS.Pod#getBlockTypes}.
      *     This check is performed by {@link PodJS.Pod#newBlockClass}.
      * @throws {Error} If the block to be returned would not be compatible with the resource provided. This check
      *     must be performed by the subclass.
      */
-    this.newBlock = function(blockType, resource) {
+    this.newBlock = function(blockType, resource, script) {
         throw new Error('Method is abstract and must be overridden by a subclass.');
     };
 
@@ -585,10 +763,11 @@ PodJS.Pod = function(initParams) {
      * @param {string} blockType The type of block to be created (e.g. "gotoXY"). Must be one of the block types
      *     returned by {@link PodJS.Pod#getBlockTypes}.
      * @param {PodJS.Block#Resource} resource The resource this block is to be bound to.
+     * @param {PodJS.Script} blockScript The script this block is to be bound to.
      * @returns {Function} The constructor of the Block class that the subclass should create a new instance of.
      * @throws {Error} If the block type provided was not one of the valid block types returned by {@link PodJS.Pod#getBlockTypes}.
      */
-    this.newBlockClass = function(blockType, resource) {
+    this.newBlockClass = function(blockType, resource, blockScript) {
         // Check that block type is one of the block types supported by this pod.
         var found = null;
         for (var i = 0; i < this.getBlockTypes().length; i++) {
@@ -638,7 +817,25 @@ PodJS.Pod = function(initParams) {
              * @member {PodJS.Pod#Resource} resource
              * @memberOf PodJS.Pod#BlockContext
              */
-            resource : resource
+            resource : resource,
+
+            /**
+             * The script this block is bound to.
+             *
+             * @instance
+             * @member {PodJS.Script} blockScript
+             * @memberOf PodJS.Pod#BlockContext
+             */
+            blockScript : blockScript,
+
+            /**
+             * The instance of the block.
+             *
+             * @instance
+             * @member {PodJS.Pod#Block} block
+             * @memberOf PodJS.Pod#BlockContext
+             */
+            block : null
         };
 
         /**
@@ -666,7 +863,16 @@ PodJS.Pod = function(initParams) {
              * @memberOf PodJS.Pod#Block
              */
             blockType : blockType,
-
+            
+            /**
+             * Information about this block
+             * 
+             * @instance
+             * @member {PodJS.BlockInfo} blockInfo
+             * @memberOf PodJS.Pod#Block
+             */
+            blockInfo : blockInfo,
+            
             /**
              * The BlockContext containing a reference to the resource to which it is bound and
              * a reference to the script in which it is executing.
@@ -682,14 +888,24 @@ PodJS.Pod = function(initParams) {
              * <p>
              * Pods are not responsible for calling tick() on their own blocks. That is taken care of by the environment.
              * <p>
-             * The super-class version of tick() does nothing. Subclasses can optionally override to perform additional actions on each
-             * environment tick.
+             * The super-class version of tick() calls tick() on the blockInfo, if present. Subclasses can optionally override to
+             * perform additional actions on each environment tick.
+             * <p>
+             * Sub-classes should be sure to set context.script.yield to true if the resource has completed its tick.
+             * <p>
+             * Sub-classes are also responsible for advancing the instruction pointer to the next instruction.
+             * <p>
+             * If this is a reporter block, then tick will return a value.
              *
              * @method tick
              * @memberOf PodJS.Pod#Block
              * @instance
+             * @return {undefined|string|number} If this is a reporter block, returns the value, else returns undefined.
              */
             tick : function() {
+                if (blockInfo.hasOwnProperty("tick")) {
+                    return blockInfo.tick(this.context);
+                }
             },
             
             /**
@@ -705,6 +921,8 @@ PodJS.Pod = function(initParams) {
             release : function() {
             }
         };
+        
+        blockContext.block = Block;
         
         return Block;
     };
@@ -761,6 +979,16 @@ PodJS.Pod = function(initParams) {
         // Check that resource type is one of the resource types supported by this pod.
         if (this.getResourceTypeNames().indexOf(resourceType) === -1) {
             throw new Error("This pod does not know how to create resources of type '" + resourceType + "'");
+        }
+
+        // Get ready to register with the resource registry (Resource.register() completes the process).
+        if (!_resourceRegistry.hasOwnProperty(resourceType)) {
+            _resourceRegistry[resourceType] = {};
+        }
+        var resources = _resourceRegistry[resourceType];
+        if (resources.hasOwnProperty(resourceName)) {
+            throw new Error("A resource of type '" + resourceType + "' already exists in this Pod with the name '" +
+                resourceName + "'. Please choose a different name.");
         }
         
         /**
@@ -882,19 +1110,22 @@ PodJS.Pod = function(initParams) {
              * @instance
              */
             tick : function() {
+            },
+            
+            /**
+             * Called by the subclass to complete the registration process once the subclass
+             * is fully intialized. Resources will not have tick() called on them or be
+             * returned until register() is called.
+             *
+             * @method register
+             * @memberof PodJS.Pod#Resource
+             * @param {object} subInstance The instance of the resource that should be registered.
+             * @instance
+             */
+            register : function(subInstance) {
+                resources[resourceName] = subInstance;
             }
         };
-        
-        // Register with resourceRegistry
-        if (!_resourceRegistry.hasOwnProperty(resourceType)) {
-            _resourceRegistry[resourceType] = {};
-        }
-        var resources = _resourceRegistry[resourceType];
-        if (resources.hasOwnProperty(resourceName)) {
-            throw new Error("A resource of type '" + resourceType + "' already exists in this Pod with the name '" +
-                resourceName + "'. Please choose a different name.");
-        }
-        resources[resourceName] = Resource;
         
         return Resource;
     };
@@ -928,7 +1159,17 @@ PodJS.ConstantBlock = function(blockContext, value) {
     this.blockType = "constant";
     this.context = blockContext;
     this.value = value;
-    this.tick = function() {};
+    this.blockInfo = {
+        blockType : "constant",
+        description : "Returns a constant number or string.",
+        parameterInfo : [],
+        returnsValue : true,
+        compatibleWith : function(resource) { return true; },
+    };
+    this.tick = function(context) {
+        console.log("constant " + value);
+        return value;
+    };
     this.release = function() {};
 };
 
@@ -973,6 +1214,17 @@ PodJS.BlockInfo = {
      * @memberOf PodJS.BlockInfo
      */
     parameterInfo : [],
+    
+    /**
+     * If true, this block is a reporter block (i.e. it returns a value, either a number or a string). The block will return a
+     * value from its tick method. Else, if false, the tick method will return undefined.
+     *
+     * @instance
+     * @type {boolean}
+     * @member returnsValue
+     * @memberOf PodJS.BlockInfo
+     */
+    returnsValue : false,
     
     /**
      * Returns true if this block is compatible with the specified resource, or false if not.
@@ -1067,16 +1319,26 @@ var CorePod = function(initParams) {
                 blockType : "begin",
                 description : "Delineates the start of a new group of blocks.",
                 parameterInfo : [],
+                returnsValue : false,
                 compatibleWith : function(resource) {
                     return true;
+                },
+                tick : function(context) {
+                    console.log("begin");
+                    context.blockScript.nextBlock();
                 }
             },
             {
                 blockType : "end",
                 description : "Delineates the end of a new group of blocks.",
                 parameterInfo : [],
+                returnsValue : false,
                 compatibleWith : function(resource) {
                     return true;
+                },
+                tick : function(context) {
+                    console.log("end");
+                    context.blockScript.popIP();
                 }
             }
         ];
@@ -1092,8 +1354,8 @@ var CorePod = function(initParams) {
         return resource;
     };
 
-    this.newBlock = function(blockType, resource) {
-        var blockClass = this.newBlockClass(blockType, resource);
+    this.newBlock = function(blockType, resource, script) {
+        var blockClass = this.newBlockClass(blockType, resource, script);
         var block = Object.create(blockClass);
         return block;
     };
