@@ -137,6 +137,40 @@ PodJS.ScratchPod = function(options) {
                     context.blockScript.nextBlock();
                 }
             },
+            {
+                blockType : "hide",
+                description : "If the block's sprite is shown, it will hide the sprite - if the sprite is already hidden, nothing happens.",
+                parameterInfo : [],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite";
+                },
+                tick : function(context) {
+                    console.log("hide");
+                    var sprite = context.resource;
+                    if (sprite.isShown()) {
+                        sprite.setShown(false);
+                    }
+                    context.blockScript.nextBlock();
+                }
+            },
+            {
+                blockType : "show",
+                description : "If the block's sprite is hidden, it will show the sprite - if the sprite is already showing, nothing will change.",
+                parameterInfo : [],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite";
+                },
+                tick : function(context) {
+                    console.log("show");
+                    var sprite = context.resource;
+                    if (!sprite.isShown()) {
+                        sprite.setShown(true);
+                    }
+                    context.blockScript.nextBlock();
+                }
+            },
             // Control Blocks
             {
                 blockType : "forever",
