@@ -115,6 +115,26 @@ PodJS.ScratchPod = function(options) {
                     var sprite = context.resource;
                     sprite.moveSteps(arg);
                     context.blockScript.nextBlock();
+                    context.blockScript.yield = true;
+                }
+            },
+            // Looks Blocks
+            {
+                blockType : "costume",
+                description : "Changes the Sprite's costume to the specified one.",
+                parameterInfo : [
+                    { name : "costume" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite";
+                },
+                tick : function(context) {
+                    var arg = context.blockScript.nextArgument();
+                    console.log("costume " + arg);
+                    var sprite = context.resource;
+                    sprite.setCostume(arg);
+                    context.blockScript.nextBlock();
                 }
             },
             // Control Blocks
@@ -266,7 +286,7 @@ PodJS.ScratchPod = function(options) {
                     var index = -1;
                     if (_currentCostume !== null) {
                         // Remove from stage
-                        var easelBitmap = _currentCostume.getEaselBitmap();
+                        var easelBitmap = _costumes[_currentCostume].getEaselBitmap();
                         index = _easelStage.getChildIndex(easelBitmap);
                         if (index !== -1) {
                             // Unfortuantely, there's no replaceAt, so we remove and re-add at a cost of 2n.
