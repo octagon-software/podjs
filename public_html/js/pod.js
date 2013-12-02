@@ -239,6 +239,37 @@ PodJS = function(options) {
     };
 
     /**
+     * Resets all scripts in all pods back to the first instruction.
+     *
+     * @method resetAllScripts
+     * @memberof PodJS
+     * @instance
+     */
+    this.resetAllScripts = function() {
+        for (var name in _pods) {
+            if (_pods.hasOwnProperty(name)) {
+                var pod = _pods[name];
+                var resources = pod.getAllResources();
+                for (var resType in resources) {
+                    if (resources.hasOwnProperty(resType)) {
+                        var resourceByType = resources[resType];
+                        for (var resName in resourceByType) {
+                            if (resourceByType.hasOwnProperty(resName)) {
+                                var resource = resourceByType[resName];
+                                var scripts = resource.scripts;
+                                for (var i = 0; i < scripts.length; i++) {
+                                    var script = scripts[i];
+                                    script.reset();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    /**
      * Called at approximately 30 frames per second to animate all resources.
      * <p>
      * This calls tick on each registered pod, resource and script.
@@ -257,7 +288,7 @@ PodJS = function(options) {
                 for (var resType in resources) {
                     if (resources.hasOwnProperty(resType)) {
                         var resourceByType = resources[resType];
-                        
+
                         for (var resName in resourceByType) {
                             if (resourceByType.hasOwnProperty(resName)) {
                                 var resource = resourceByType[resName];
@@ -268,14 +299,14 @@ PodJS = function(options) {
                                     var script = scripts[i];
                                     script.tick();
                                 }
-                                
+
                                 // next, tick the resource itself.
                                 resource.tick();
                             }
                         }
                     }
                 }
-                
+
                 // next, tick the pod itself
                 pod.tick();
             }
@@ -527,6 +558,25 @@ PodJS.Script = function(context) {
     };
 
     /**
+     * Reset this script to the first instruction.
+     *
+     * @instance
+     * @method reset
+     * @memberof PodJS.Script
+     */
+    this.reset = function() {
+        this.index = 0;
+        this.ipStack = [];
+        this.yield = false;
+        
+        // Reset all blocks in the script so they can wipe out their state
+        for (var i = 0; i < _blocks.length; i++) {
+            var block = _blocks[i];
+            block.reset();
+        }
+    };
+
+    /**
      * Gets called by the environment when this script is active.
      * <p>
      * Pods are not responsible for calling tick() on their own scripts. That is taken care of by the environment.
@@ -584,7 +634,7 @@ PodJS.Pod = function(initParams) {
      * @type {PodJS}
      */
     var _environment = initParams.env;
-
+    
     /**
      * Deletes the resource with the given name and deregisters it from the pod.
      *
@@ -909,6 +959,21 @@ PodJS.Pod = function(initParams) {
             },
             
             /**
+             * Gets called by the environment when a script is reset, giving the block an opportunity to clear its state.
+             * <p>
+             * The default behvaior calls reset() in the blockInfo for the block, if it is present.
+             *
+             * @method reset
+             * @memberOf PodJS.Pod#Block
+             * @instance
+             */
+            reset : function() {
+                if (blockInfo.hasOwnProperty("reset") && (blockInfo.reset !== null)) {
+                    blockInfo.reset(this.context);
+                }
+            },
+            
+            /**
              * Release the system resources associated with this block.
              * <p>
              * Sub-classes can optionally override this method, but must always call the super-class to ensure the proper
@@ -1171,6 +1236,7 @@ PodJS.ConstantBlock = function(blockContext, value) {
         return value;
     };
     this.release = function() {};
+    this.reset = function() {};
 };
 
 /////////////////////////////////////////////////////////////////////
@@ -1214,6 +1280,16 @@ PodJS.BlockInfo = {
      * @memberOf PodJS.BlockInfo
      */
     parameterInfo : [],
+    
+    /**
+     * Optional function to reset the state of the block. If present, this will be called whenever the script is reset.
+     *
+     * @instance
+     * @method reset
+     * @param {PodJS.Pod#BlockContext} context So that the block can have access to its environment, etc. during reset.
+     * @memberOf PodJS.BlockInfo
+     */
+    reset : null,
     
     /**
      * If true, this block is a reporter block (i.e. it returns a value, either a number or a string). The block will return a
