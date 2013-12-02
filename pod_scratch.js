@@ -118,6 +118,27 @@ PodJS.ScratchPod = function(options) {
                     context.blockScript.yield = true;
                 }
             },
+            {
+                blockType : "go_xy",
+                description : "sets the sprite's X and Y position to the specified amounts.",
+                parameterInfo : [
+                    { name : "x" },
+                    { name : "y" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite";
+                },
+                tick : function(context) {
+                    var x = context.blockScript.nextArgument();
+                    var y = context.blockScript.nextArgument();
+                    console.log("go_xy " + x + " " + y);
+                    var sprite = context.resource;
+                    sprite.goXY(x, y);
+                    context.blockScript.nextBlock();
+                    context.blockScript.yield = true;
+                }
+            },
             // Looks Blocks
             {
                 blockType : "costume",
@@ -399,6 +420,20 @@ PodJS.ScratchPod = function(options) {
             this.moveSteps = function(steps) {
                 //TODO: Move based on direction, not always to the right
                 _x += steps;
+            };
+
+            /**
+             * Sets the sprite's X and Y position to the specified amounts.
+             *
+             * @method go_xy
+             * @param {number} x The x position, in pixels.
+             * @param {number} y The y position, in pixels.
+             * @memberof PodJS.ScratchPod.Sprite
+             * @instance
+             */
+            this.goXY = function(x, y) {
+                _x = x;
+                _y = y;
             };
         };
         Sprite.prototype = parentObject;
