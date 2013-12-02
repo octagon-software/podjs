@@ -31,6 +31,7 @@ robot.loadCostume("costume1", "img/Cartoon_Robot_a.svg");
 robot.loadCostume("costume2", "img/Cartoon_Robot_b.svg");
 
 robot.newScript().
+    when_green_flag_clicked.
     forever.begin.
         costume.c("costume1").
         move.c(10).

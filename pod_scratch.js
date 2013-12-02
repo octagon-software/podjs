@@ -50,13 +50,76 @@ PodJS.ScratchPod = function(options) {
     var ScratchPod_this = this;
 
     /**
-     * The div that contains the stage
+     * The environment this pod is in
+     *
+     * @private
+     * @instance
+     * @memberof PodJS.ScratchPod
+     */
+    var _env = options.env;
+    
+    /**
+     * The div that contains the stage and controls
      *
      * @private
      * @instance
      * @memberof PodJS.ScratchPod
      */
     var _div;
+    
+    /**
+     * The div that contains just the controls
+     *
+     * @private
+     * @instance
+     * @memberof PodJS.ScratchPod
+     */
+    var _controlsDiv;
+    
+    /**
+     * The img for the red stop button
+     *
+     * @private
+     * @instance
+     * @memberof PodJS.ScratchPod
+     */
+    var _redStopButton;
+    
+    /**
+     * The img for the green flag button
+     *
+     * @private
+     * @instance
+     * @memberof PodJS.ScratchPod
+     */
+    var _greenFlagButton;
+    
+    /**
+     * Records the last time the green flag was clicked, in millis since epoch.
+     *
+     * @private
+     * @instance
+     * @memberof PodJS.ScratchPod
+     */
+    var _lastGreenFlagClickTime = 0;
+    
+    /**
+     * True if the green flag is clicked and the scratch app is running or false if not.
+     * 
+     * @private
+     * @instance
+     * @memberof PodJS.ScratchPod
+     */
+    var _running = false;
+
+    /**
+     * The div that contains just the stage
+     *
+     * @private
+     * @instance
+     * @memberof PodJS.ScratchPod
+     */
+    var _stageDiv;
     
     /**
      * The canvas inside the div that contains the stage
@@ -97,6 +160,7 @@ PodJS.ScratchPod = function(options) {
      */
     this.getBlockTypes = function() {
         return [
+            //////////////////////////////////////////////////////////////
             // Motion Blocks
             {
                 blockType : "move",
@@ -139,6 +203,8 @@ PodJS.ScratchPod = function(options) {
                     context.blockScript.yield = true;
                 }
             },
+            
+            //////////////////////////////////////////////////////////////
             // Looks Blocks
             {
                 blockType : "costume",
@@ -192,6 +258,33 @@ PodJS.ScratchPod = function(options) {
                     context.blockScript.nextBlock();
                 }
             },
+
+            //////////////////////////////////////////////////////////////
+            // EventBlocks
+            {
+                blockType : "when_green_flag_clicked",
+                description : " Scripts that wear this block will activate once the Green Flag has been clicked - " +
+                    "these scripts can activate other scripts and enable the entire program.",
+                parameterInfo : [],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                tick : function(context) {
+                    var lastGreenFlagClickTime = context.block.lastGreenFlagClickTime;
+                    if (typeof(lastGreenFlagClickTime) === "undefined" || lastGreenFlagClickTime === null) {
+                        var now = Date.now();
+                        lastGreenFlagClickTime = now;
+                        context.block.lastGreenFlagClickTime = lastGreenFlagClickTime;
+                    } else if (_lastGreenFlagClickTime > lastGreenFlagClickTime) {
+                        console.log("when_green_flag_clicked");
+                        context.blockScript.nextBlock();
+                    }
+                    context.blockScript.yield = true;
+                }
+            },
+
+            //////////////////////////////////////////////////////////////
             // Control Blocks
             {
                 blockType : "forever",
@@ -218,6 +311,10 @@ PodJS.ScratchPod = function(options) {
                 returnsValue : false,
                 compatibleWith : function(resource) {
                     return true;
+                },
+                reset : function(context) {
+                    delete context.block.endTime;
+                    delete context.block.nextIP;
                 },
                 tick : function(context) {
                     var now = Date.now();
@@ -609,13 +706,70 @@ PodJS.ScratchPod = function(options) {
         if (_div === null) {
             throw new Error("Could not find div with id '" + divId + "' to bind scratch stage to.");
         }
+        _div.innerHTML = "";
+        
+        var gradientCss = "background: #e6e8e8; \
+            background: -moz-linear-gradient(top, #ffffff 0%, #e6e8e8 100%); /* FF3.6+ */ \
+            background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#ffffff), color-stop(100%,#e6e8e8)); /* Chrome,Safari4+ */ \
+            background: -webkit-linear-gradient(top, #ffffff 0%,#e6e8e8 100%); /* Chrome10+,Safari5.1+ */ \
+            background: -o-linear-gradient(top, #ffffff 0%,#e6e8e8 100%); /* Opera 11.10+ */ \
+            background: -ms-linear-gradient(top, #ffffff 0%,#e6e8e8 100%); /* IE10+ */ \
+            background: linear-gradient(top,  #ffffff 0%,#e6e8e8 100%); /* W3C */ \
+            filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#ffffff', endColorstr='#e6e8e8',GradientType=0 ); /* IE6-9 */";
+        _controlsDiv = document.createElement("div");
+        _controlsDiv.setAttribute("style", "height: 32px; width: 100%; " + gradientCss);
+        
+        _redStopButton = document.createElement("img");
+        _redStopButton.setAttribute("style", "width: 24px; height: 24px; float: right; margin-top: 4px; margin-right: 8px;");
+        _redStopButton.onmouseover = function() { this.src='img/red_stop_on.png'; };
+        _redStopButton.onmouseout = function() {
+            if (_running) {
+                this.src='img/red_stop_off.png';
+            } else {
+                this.src='img/red_stop_on.png';
+            }
+        };
+        _redStopButton.onclick = function() {
+            _running = false;
+            _lastGreenFlagClickTime = 0;
+            _env.resetAllScripts();
+            _redStopButton.onmouseout();
+            _greenFlagButton.onmouseout();
+        };
+        _redStopButton.onmouseout();
+        _controlsDiv.appendChild(_redStopButton);
+        
+        _greenFlagButton = document.createElement("img");
+        _greenFlagButton.setAttribute("style", "width: 24px; height: 24px; float: right; margin-top: 4px; margin-right: 8px;");
+        _greenFlagButton.onmouseover = function() { this.src='img/green_flag_on.png'; };
+        _greenFlagButton.onmouseout = function() {
+            if (_running) {
+                this.src='img/green_flag_on.png';
+            } else {
+                this.src='img/green_flag_off.png';
+            }
+        };
+        _greenFlagButton.onclick = function() {
+            _running = true;
+            _lastGreenFlagClickTime = Date.now();
+            _env.resetAllScripts();
+            _redStopButton.onmouseout();
+            _greenFlagButton.onmouseout();
+        };
+        _greenFlagButton.onmouseout();
+        _controlsDiv.appendChild(_greenFlagButton);
+        
+        _stageDiv = document.createElement("div");
+        _stageDiv.setAttribute("style", "height: " + (_div.offsetHeight - 34) + "px; width: 100%;");
+        _div.appendChild(_controlsDiv);
+        _div.appendChild(_stageDiv);
 
-        // Add canvas to div
+        // Add canvas to _stageDiv
         _canvas.style.width = "100%";
         _canvas.style.height = "100%";
-        _canvas.width = _div.offsetWidth;
-        _canvas.height = _div.offsetHeight;
-        _div.appendChild(_canvas);
+        _canvas.width = _stageDiv.offsetWidth;
+        _canvas.height = _stageDiv.offsetHeight;
+        _stageDiv.appendChild(_canvas);
         
         // Attach createjs to canvas
         _easelStage = new createjs.Stage(_canvas);
