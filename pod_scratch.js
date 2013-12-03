@@ -429,7 +429,71 @@ PodJS.ScratchPod = function(options) {
                         context.blockScript.yield = true;
                     }
                 }
+            },
+
+            //////////////////////////////////////////////////////////////
+            // Operators Blocks
+            {
+                blockType : "equals",
+                description : "The block checks if the first value is equal to the other value. If the values are equal, " +
+                    "the block returns true; if not, false.",
+                parameterInfo : [
+                    { name : "firstValue" },
+                    { name : "secondValue" }
+                ],
+                returnsValue : true,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                tick : function(context) {
+                    var firstValue = context.blockScript.nextArgument();
+                    var secondValue = context.blockScript.nextArgument();
+                    var result = (firstValue.toString() === secondValue.toString()).toString();
+                    console.log("equals " + firstValue + " " + secondValue + " == " + result);
+                    return result;
+                }
+            },
+            {
+                blockType : "greater",
+                description : "The block checks if the first value is greater than the second value. If it is greater, the " +
+                    "block returns true; if not, it returns false.",
+                parameterInfo : [
+                    { name : "firstValue" },
+                    { name : "secondValue" }
+                ],
+                returnsValue : true,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                tick : function(context) {
+                    var firstValue = context.blockScript.nextArgument();
+                    var secondValue = context.blockScript.nextArgument();
+                    var result = (Number(firstValue) > Number(secondValue)).toString();
+                    console.log("greater " + firstValue + " " + secondValue + " == " + result);
+                    return result;
+                }
+            },
+            {
+                blockType : "less",
+                description : "The block checks if the first value is less than the second value. If it is less, the " +
+                    "block returns true; if not, it returns false.",
+                parameterInfo : [
+                    { name : "firstValue" },
+                    { name : "secondValue" }
+                ],
+                returnsValue : true,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                tick : function(context) {
+                    var firstValue = context.blockScript.nextArgument();
+                    var secondValue = context.blockScript.nextArgument();
+                    var result = (Number(firstValue) < Number(secondValue)).toString();
+                    console.log("less " + firstValue + " " + secondValue + " == " + result);
+                    return result;
+                }
             }
+            
         ];
     };
 
