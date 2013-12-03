@@ -149,6 +149,15 @@ PodJS.ScratchPod = function(options) {
     var _stage;
 
     /**
+     * Table of the last time each message was sent.
+     *
+     * @private
+     * @instance
+     * @memberof PodJS.ScratchPod
+     */
+    var _broadcastMessages = {};
+
+    /**
      * Part of the Pod standard interface - return information about the blocks provided
      * by the scratch pod.
      *
@@ -262,6 +271,23 @@ PodJS.ScratchPod = function(options) {
             //////////////////////////////////////////////////////////////
             // EventBlocks
             {
+                blockType : "broadcast",
+                description : "Sends a broadcast throughout the whole Scratch program. Any scripts in any sprites that " +
+                    "are hatted with the When I Receive () block that is set to a specified broadcast will activate.",
+                parameterInfo : [ { "name" : "message" } ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                tick : function(context) {
+                    var message = context.blockScript.nextArgument();
+                    console.log("broadcast " + message);
+                    _broadcastMessages[message] = Date.now();
+                    context.blockScript.nextBlock();
+                    context.blockScript.yield = true;
+                }
+            },
+            {
                 blockType : "when_green_flag_clicked",
                 description : "Scripts that wear this block will activate once the Green Flag has been clicked - " +
                     "these scripts can activate other scripts and enable the entire program.",
@@ -272,8 +298,9 @@ PodJS.ScratchPod = function(options) {
                     return true;
                 },
                 tick : function(context) {
-                    var lastGreenFlagClickTime = context.block.lastGreenFlagClickTime;
-                    if (typeof(lastGreenFlagClickTime) === "undefined" || lastGreenFlagClickTime === null) {
+                    var lastGreenFlagClickTime = context.block.hasOwnProperty("lastGreenFlagClickTime") ?
+                        context.block.lastGreenFlagClickTime : null;
+                    if (lastGreenFlagClickTime === null) {
                         var now = Date.now();
                         lastGreenFlagClickTime = now;
                         context.block.lastGreenFlagClickTime = lastGreenFlagClickTime;
@@ -281,6 +308,46 @@ PodJS.ScratchPod = function(options) {
                         context.block.lastGreenFlagClickTime = _lastGreenFlagClickTime;
                         console.log("when_green_flag_clicked");
                         context.blockScript.nextBlock();
+                    }
+                    context.blockScript.yield = true;
+                }
+            },
+            {
+                blockType : "when_receive",
+                description : "Scripts that begin with this block will be invoked once the specified broadcast has " +
+                    "been sent by a calling script.",
+                parameterInfo : [ { "name" : "message" }],
+                returnsValue : false,
+                eventBlock : true,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                reset : function(context) {
+                    delete context.block.messageName;
+                    delete context.block.nextIP;
+                },
+                tick : function(context) {
+                    var messageName;
+                    if (context.block.hasOwnProperty("messageName")) {
+                        messageName = context.block.messageName;
+                    } else {
+                        var ip = context.blockScript.index;
+                        messageName = context.blockScript.nextArgument();
+                        context.block.nextIP = context.blockScript.index + 1;
+                        context.blockScript.index = ip;
+                        context.block.messageName = messageName;
+                    }
+                    var lastEventTime = context.block.hasOwnProperty("lastEventTime") ? context.block.lastEventTime : null;
+                    if (lastEventTime === null) {
+                        var now = Date.now();
+                        lastEventTime = now;
+                        context.block.lastEventTime = lastEventTime;
+                    } else if (_broadcastMessages.hasOwnProperty(messageName) && _broadcastMessages[messageName] > lastEventTime) {
+                        context.block.lastEventTime = _broadcastMessages[messageName];
+                        console.log("when_receive " + messageName);
+                        context.blockScript.nextBlock();
+                        context.blockScript.index = context.block.nextIP;
+                        this.reset(context);
                     }
                     context.blockScript.yield = true;
                 }
@@ -296,8 +363,9 @@ PodJS.ScratchPod = function(options) {
                 },
                 tick : function(context) {
                     var sprite = context.resource;
-                    var lastSpriteClickTime = context.block.lastSpriteClickTime;
-                    if (typeof(lastSpriteClickTime) === "undefined" || lastSpriteClickTime === null) {
+                    var lastSpriteClickTime = context.block.hasOwnProperty("lastSpriteClickTime") ?
+                        context.block.lastSpriteClickTime : null;
+                    if (lastSpriteClickTime === null) {
                         var now = Date.now();
                         lastSpriteClickTime = now;
                         context.block.lastSpriteClickTime = lastSpriteClickTime;
@@ -344,8 +412,8 @@ PodJS.ScratchPod = function(options) {
                 },
                 tick : function(context) {
                     var now = Date.now();
-                    var endTime = context.block.endTime;
-                    if (typeof(endTime) === "undefined" || endTime === null) {
+                    var endTime = context.block.hasOwnProperty("endTime") ? context.block.endTime : null;
+                    if (endTime === null) {
                         console.log("wait");
                         var ip = context.blockScript.index;
                         var delay = context.blockScript.nextArgument();
@@ -355,9 +423,8 @@ PodJS.ScratchPod = function(options) {
                         context.block.endTime = endTime;
                     }
                     if (now >= endTime) {
-                        delete context.block.endTime;
                         context.blockScript.index = context.block.nextIP;
-                        delete context.block.nextIP;
+                        this.reset(context);
                     } else {
                         context.blockScript.yield = true;
                     }
