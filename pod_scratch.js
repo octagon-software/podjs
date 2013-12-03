@@ -263,10 +263,11 @@ PodJS.ScratchPod = function(options) {
             // EventBlocks
             {
                 blockType : "when_green_flag_clicked",
-                description : " Scripts that wear this block will activate once the Green Flag has been clicked - " +
+                description : "Scripts that wear this block will activate once the Green Flag has been clicked - " +
                     "these scripts can activate other scripts and enable the entire program.",
                 parameterInfo : [],
                 returnsValue : false,
+                eventBlock : true,
                 compatibleWith : function(resource) {
                     return true;
                 },
@@ -277,7 +278,32 @@ PodJS.ScratchPod = function(options) {
                         lastGreenFlagClickTime = now;
                         context.block.lastGreenFlagClickTime = lastGreenFlagClickTime;
                     } else if (_lastGreenFlagClickTime > lastGreenFlagClickTime) {
+                        context.block.lastGreenFlagClickTime = _lastGreenFlagClickTime;
                         console.log("when_green_flag_clicked");
+                        context.blockScript.nextBlock();
+                    }
+                    context.blockScript.yield = true;
+                }
+            },
+            {
+                blockType : "when_sprite_clicked",
+                description : "Scripts that wear the block will activate once its sprite is clicked.",
+                parameterInfo : [],
+                returnsValue : false,
+                eventBlock : true,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite";
+                },
+                tick : function(context) {
+                    var sprite = context.resource;
+                    var lastSpriteClickTime = context.block.lastSpriteClickTime;
+                    if (typeof(lastSpriteClickTime) === "undefined" || lastSpriteClickTime === null) {
+                        var now = Date.now();
+                        lastSpriteClickTime = now;
+                        context.block.lastSpriteClickTime = lastSpriteClickTime;
+                    } else if (sprite.lastClickTime > lastSpriteClickTime) {
+                        context.block.lastSpriteClickTime = sprite.lastClickTime;
+                        console.log("when_sprite_clicked");
                         context.blockScript.nextBlock();
                     }
                     context.blockScript.yield = true;
@@ -395,11 +421,21 @@ PodJS.ScratchPod = function(options) {
          * @classdesc Model for the Scratch Sprite class
          */
         var Sprite = function() {
+            var Sprite_this = this;
             var _costumes = {};
             var _currentCostume = null;
             var _show = true;
             var _x = 0;
             var _y = 0;
+            
+            /**
+             * The last time this Sprite was clicked, or 0 if never clicked, in millis since epoch.
+             * 
+             * @instance
+             * @member {number} lastClickTime
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.lastClickTime = 0;
 
             /**
              * Load and register a new costume for this sprite.
@@ -415,6 +451,10 @@ PodJS.ScratchPod = function(options) {
                     throw "Sprite already has a costume called '" + name + "'";
                 }
                 var costume = new Costume(src);
+                var bitmap = costume.getEaselBitmap();
+                bitmap.addEventListener("click", function(event) {
+                    Sprite_this.lastClickTime = Date.now();
+                });
                 _costumes[name] = costume;
                 if (_currentCostume === null) {
                     this.setCostume(name);
@@ -480,7 +520,7 @@ PodJS.ScratchPod = function(options) {
              * 
              * @instance
              * @method isShown
-             * @param {boolean} true if this is to be shown or false if not.
+             * @return {boolean} true if this is to be shown or false if not.
              * @memberof PodJS.ScratchPod.Sprite
              */
             this.isShown = function() {
@@ -787,6 +827,41 @@ PodJS.ScratchPod = function(options) {
     this.tick = function() {
         if (_easelStage !== null) {
             _easelStage.update();
+        }
+
+        // TODO: This can be made much more efficient
+        // Update running status: check if all scripts are at the beginning. If so, virtually click stop.
+        var allScriptsAtZero = true;
+        var resources = this.getAllResources();
+        for (var resType in resources) {
+            if (resources.hasOwnProperty(resType)) {
+                var resourceByType = resources[resType];
+                for (var resName in resourceByType) {
+                    if (resourceByType.hasOwnProperty(resName)) {
+                        var resource = resourceByType[resName];
+                        var scripts = resource.scripts;
+                        for (var i = 0; i < scripts.length; i++) {
+                            var script = scripts[i];
+                            if (script.index !== 0) {
+                                allScriptsAtZero = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (allScriptsAtZero) {
+            if (_running) {
+                _running = false;
+                _redStopButton.onmouseout();
+                _greenFlagButton.onmouseout();
+            }
+        } else {
+            if (!_running) {
+                _running = true;
+                _redStopButton.onmouseout();
+                _greenFlagButton.onmouseout();
+            }
         }
     };
 
