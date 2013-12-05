@@ -566,8 +566,8 @@ PodJS.Script = function(context) {
     // TODO: validate method
 
     /**
-     * Read the next block as an argument. Note the block might be composite, causing additional blocks to be read
-     * (e.g. in the case of something like add.c(1).c(2)). This method is typically called by a block implementation.
+     * Advance the IP and read the next block as an argument. Note the block might be composite, causing additional blocks to
+     * be read (e.g. in the case of something like add.c(1).c(2)). This method is typically called by a block implementation.
      *
      * @instance
      * @method nextArgument
@@ -582,6 +582,43 @@ PodJS.Script = function(context) {
                 throw new Error("Expecting a block that returns a value but got '" + block.blockType + "'");
             }
             return block.tick();
+        }
+    };
+
+    /**
+     * Start at the begin block and advance the IP past the next matching end block, skipping all blocks in-between.
+     *
+     * @instance
+     * @method skipBeginEndBlock
+     * @memberof PodJS.Script
+     */
+    this.skipBeginEndBlock = function() {
+        if (this.index < _blocks.length) {
+            var block = _blocks[this.index];
+            if (block.blockType !== "begin") {
+                throw new Error("Expecting a 'begin' block but got '" + block.blockType + "'");
+            }
+            this.index++;
+            var foundEnd = false;
+            var beginCount = 0;
+            while (this.index < _blocks.length) {
+                block = _blocks[this.index];
+                this.index++;
+                if (block.blockType === "begin") {
+                    beginCount++;
+                } else if (block.blockType === "end") {
+                    if (beginCount > 0) {
+                        beginCount--;
+                    } else {
+                        foundEnd = true;
+                        break;
+                        // IP will already have been incremented.
+                    }
+                }
+            }
+            if (!foundEnd) {
+                throw new Error("Passed the end of the script looking for matching end block");
+            }
         }
     };
 
