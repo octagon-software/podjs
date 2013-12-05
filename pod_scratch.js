@@ -392,6 +392,23 @@ PodJS.ScratchPod = function(options) {
             //////////////////////////////////////////////////////////////
             // Control Blocks
             {
+                blockType : "otherwise",
+                description : "This block should be placed immediately after an if_then begin/end block to be executed if the " +
+                    "condition is false. The otherwise should have its own begin/end block. This block is not legal when used " +
+                    "by itself.",
+                parameterInfo : [],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                reset : function(context) {
+                },
+                tick : function(context) {
+                    throw new Error("otherwise block cannot be used by itself - it must be placed after an if_then " +
+                        "begin/end block. A common cause of this error is a missing 'end' before an 'otherwise'.");
+                }
+            },
+            {
                 blockType : "forever",
                 description : "Blocks held inside this block will be in a loop - just like the Repeat () block and the " +
                     "Repeat Until () block, except that the loop never ends (unless the stop sign is clicked, the Stop All " +
@@ -409,9 +426,9 @@ PodJS.ScratchPod = function(options) {
             },
             {
                 blockType : "if_then",
-                description : "The block will check its boolean condition. If the condition is true, the code held " +
-                    "inside the block will run, and then the script involved will continue. If the condition is false, " +
-                    "the code inside the block will be ignored and the script will move on.",
+                description : "The block will check its boolean condition: if the condition is true, the code held inside the " +
+                    "first begin/end will activate, and then the script will continue; if the condition is false, then if " +
+                    "an otherwise block is present immediately after the end the code inside the second begin/end will activate.",
                 parameterInfo : [ { name : "condition" } ],
                 returnsValue : false,
                 compatibleWith : function(resource) {
@@ -435,11 +452,28 @@ PodJS.ScratchPod = function(options) {
                             context.blockScript.index = context.block.nextIP;
                         } else {
                             context.blockScript.skipBeginEndBlock();
+                            var b = context.blockScript.peekBlock();
+                            if (b.blockType === "otherwise") {
+                                // execute the otherwise block
+                                context.blockScript.nextBlock();
+                                var beginIP = context.blockScript.index;
+                                console.log("otherwise");
+                                context.blockScript.index = ipOfIfElse;
+                                context.blockScript.pushIP();
+                                context.blockScript.index = beginIP;
+                            }
                         }
                     } else {
-                        // hit the end block and now we're back to the if block to see where to go next. Always skip begin/end.
+                        // hit the end block and now we're back to the if or otherwise block to see where to go next.
+                        // Always skip begin/end.
                         context.blockScript.index = context.block.nextIP;
                         context.blockScript.skipBeginEndBlock();
+                        var b = context.blockScript.peekBlock();
+                        if (b.blockType === "otherwise") {
+                            context.blockScript.nextBlock();
+                            // skip past begin/end of otherwise as well.
+                            context.blockScript.skipBeginEndBlock();
+                        }
                         delete context.block.evaluated;
                         delete context.block.nextIP;
                     }
