@@ -408,6 +408,44 @@ PodJS.ScratchPod = function(options) {
                 }
             },
             {
+                blockType : "if_then",
+                description : "The block will check its boolean condition. If the condition is true, the code held " +
+                    "inside the block will run, and then the script involved will continue. If the condition is false, " +
+                    "the code inside the block will be ignored and the script will move on.",
+                parameterInfo : [ { name : "condition" } ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                reset : function(context) {
+                    delete context.block.evaluated;
+                    delete context.block.nextIP;
+                },
+                tick : function(context) {
+                    if (typeof(context.block.evaluated) === "undefined") {
+                        var ipOfIfElse = context.blockScript.index;
+                        context.block.evaluated = true;
+                        var condition = truthy(context.blockScript.nextArgument());
+                        context.blockScript.nextBlock();
+                        context.block.nextIP = context.blockScript.index;
+                        console.log("if_then " + condition);
+                        if (condition) {
+                            context.blockScript.index = ipOfIfElse;
+                            context.blockScript.pushIP();
+                            context.blockScript.index = context.block.nextIP;
+                        } else {
+                            context.blockScript.skipBeginEndBlock();
+                        }
+                    } else {
+                        // hit the end block and now we're back to the if block to see where to go next. Always skip begin/end.
+                        context.blockScript.index = context.block.nextIP;
+                        context.blockScript.skipBeginEndBlock();
+                        delete context.block.evaluated;
+                        delete context.block.nextIP;
+                    }
+                }
+            },
+            {
                 blockType : "wait",
                 description : "pauses its script for the specified amount of seconds - the wait can also be a decimal number.",
                 parameterInfo : [
