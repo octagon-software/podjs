@@ -542,6 +542,22 @@ PodJS.Script = function(context) {
     };
 
     /**
+     * Peeks at the block at the current IP but does not advance the iP.
+     *
+     * @instance
+     * @method peekBlock
+     * @return The block at the current IP or null if no block there.
+     * @memberof PodJS.Script
+     */
+    this.peekBlock = function() {
+        var result = null;
+        if (this.index < _blocks.length) {
+            result = _blocks[this.index];
+        }
+        return result;
+    };
+
+    /**
      * Pushes the current instruction pointer to the stack (usually done just before a loop).
      *
      * @instance
