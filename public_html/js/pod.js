@@ -181,14 +181,14 @@ PodJS = function(options) {
              * creation time but is not re-evaluated in the future.
              * 
              * @instance
-             * @method constant
+             * @method c
              * @param {number|string} value The value to specify as a constant.
              * @return {PodJS.ScriptBuilder} The builder, so additional blocks can be chained.
              * @memberof {PodJS.ScriptBuilder}
              */
             this.c = function(value) {
                 if (typeof(value) !== "number" && typeof(value) !== "string") {
-                    throw new Error("For block 'constant', parameter must be a number or string.");
+                    throw new Error("For block 'c', parameter must be a number or string.");
                 }
                 
                 var blockContext = {
@@ -201,6 +201,34 @@ PodJS = function(options) {
                 var constantBlock = new PodJS.ConstantBlock(blockContext, value);
                 blockContext.block = constantBlock;
                 blockScript.addBlock(constantBlock);
+                return scriptBuilderThis;
+            };
+            
+            /**
+             * Add a JavaScript function block to the script. A JavaScript function block is a special-purpose block that takes
+             * a function parameter and evaluates the function each time the block is executed.
+             * 
+             * @instance
+             * @method f
+             * @param {function} fn The function to evaluate when the block is evaluated.
+             * @return {PodJS.ScriptBuilder} The builder, so additional blocks can be chained.
+             * @memberof {PodJS.ScriptBuilder}
+             */
+            this.f = function(fn) {
+                if (typeof(fn) !== "function") {
+                    throw new Error("For block 'f', parameter must be a function.");
+                }
+                
+                var blockContext = {
+                    environment : blockScript.context.environment,
+                    pod : null, // core block is not associated with any pod.
+                    resource : blockScript.context.resource,
+                    blockScript : blockScript,
+                    block : null
+                };
+                var functionBlock = new PodJS.FunctionBlock(blockContext, fn);
+                blockContext.block = functionBlock;
+                blockScript.addBlock(functionBlock);
                 return scriptBuilderThis;
             };
             
@@ -1267,6 +1295,29 @@ PodJS.ConstantBlock = function(blockContext, value) {
     };
     this.tick = function(context) {
         console.log("constant " + value);
+        return value;
+    };
+    this.release = function() {};
+    this.reset = function() {};
+};
+
+/////////////////////////////////////////////////////////////////////
+// PodJS.FunctionBlock
+
+PodJS.FunctionBlock = function(blockContext, fn) {
+    this.blockType = "function";
+    this.context = blockContext;
+    this.fn = fn;
+    this.blockInfo = {
+        blockType : "function",
+        description : "Evaluates a JavaScript function and uses that value.",
+        parameterInfo : [],
+        returnsValue : true,
+        compatibleWith : function(resource) { return true; },
+    };
+    this.tick = function(context) {
+        var value = fn.call(); 
+        console.log("function " + value);
         return value;
     };
     this.release = function() {};
