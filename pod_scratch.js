@@ -610,6 +610,26 @@ PodJS.ScratchPod = function(options) {
                 }
             },
             {
+                blockType : "join",
+                description : "concatenates, or \"links\" the two values together and reports the result - for example, " +
+                    "if \"hello\" and \"world\" were put in the block, it would report \"helloworld\". ",
+                parameterInfo : [
+                    { name : "firstValue" },
+                    { name : "secondValue" }
+                ],
+                returnsValue : true,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                tick : function(context) {
+                    var firstValue = context.blockScript.nextArgument();
+                    var secondValue = context.blockScript.nextArgument();
+                    var result = String(firstValue) + String(secondValue);
+                    console.log("join " + firstValue + " " + secondValue + " == " + result);
+                    return result;
+                }
+            },
+            {
                 blockType : "less",
                 description : "The block checks if the first value is less than the second value. If it is less, the " +
                     "block returns true; if not, it returns false.",
@@ -626,6 +646,56 @@ PodJS.ScratchPod = function(options) {
                     var secondValue = context.blockScript.nextArgument();
                     var result = (Number(firstValue) < Number(secondValue)).toString();
                     console.log("less " + firstValue + " " + secondValue + " == " + result);
+                    return result;
+                }
+            },
+            {
+                blockType : "not",
+                description : "The block checks if the boolean inside it is false - if it is false, the block returns " +
+                    "true; if the condition is true, it returns false.",
+                parameterInfo : [
+                    { name : "value" }
+                ],
+                returnsValue : true,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                tick : function(context) {
+                    var value = context.blockScript.nextArgument();
+                    var result = String(!truthy(value));
+                    console.log("not " + value + " == " + result);
+                    return result;
+                }
+            },
+            {
+                blockType : "random_from_to",
+                description : "picks a psuedorandom number ranging from the first given number to the second, including " +
+                    "both endpoints. If both numbers have no decimals, it will report a whole number. For example, " +
+                    "if a 1 and a 3 were imputed, the block could return a 1, 2 or 3. If one of the numbers has a decimal " +
+                    "point, even .0, it reports a number with a decimal.",
+                parameterInfo : [
+                    { name : "from" },
+                    { name : "to" }
+                ],
+                returnsValue : true,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                tick : function(context) {
+                    var from = context.blockScript.nextArgument();
+                    var to = context.blockScript.nextArgument();
+                    var floatingPoint = (String(from).indexOf('.') !== -1) || (String(to).indexOf('.') !== -1);
+                    from = Number(from);
+                    to = Number(to);
+                    var result;
+                    if (floatingPoint) {
+                        // return floating-point number
+                        result = from + Math.random() * (to - from);
+                    }  else {
+                        // return int number
+                        result = Math.floor(from + Math.random() * (to - from + 1));
+                    }
+                    console.log("random_from_to " + from + " to " + to + " == " + result);
                     return result;
                 }
             }
