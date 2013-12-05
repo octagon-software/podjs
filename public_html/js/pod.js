@@ -489,6 +489,16 @@ PodJS.Script = function(context) {
      * @memberof PodJS.Script
      */
     this.yield = false;
+    
+    /**
+     * If true, this script has an error, so it is disabled.
+     *
+     * @instance
+     * @member scriptHasError
+     * @type {boolean}
+     * @memberof PodJS.Script
+     */
+    this.scriptHasError = false;
 
     /**
      * The sequence of blocks present in this script.
@@ -667,44 +677,54 @@ PodJS.Script = function(context) {
      * @instance
      */
     this.tick = function() {
-        this.yield = false;
-        
-        // check that, if this is the first statement, it has to be an event block.
-        var block = _blocks[this.index];
-        var eventBlock = block.blockInfo.hasOwnProperty("eventBlock") && block.blockInfo.eventBlock;
-        if (this.index === 0 && !eventBlock) {
-            if (!this.hasOwnProperty("warnScriptDoesNotStartWithEventBlock")) {
-                console.log("Warning: Script does not start with event block, so skipping.");
-                this.warnScriptDoesNotStartWithEventBlock = true;
+        try {
+            if (this.scriptHasError) {
+                return;
             }
-            return;
-        }
-        
-        // always run event block at start of script in case the event becomes true again.
-        var prevIndex = this.index;
-        this.index = 0;
-        block = _blocks[this.index];
-        block.tick();
-        if (this.index === 0) {
-            // event is not true. continue.
-            this.index = prevIndex;
-            this.yield = false;
-        } else {
-            // event was true - reset script and continue.
-            var prevIndex = this.index;
-            this.reset();
-            this.index = prevIndex;
-        }
 
-        // Keep executing statements until yield is true or we hit the end of the script
-        while (!this.yield && this.index < _blocks.length) {
+            this.yield = false;
+
+            // check that, if this is the first statement, it has to be an event block.
+            var block = _blocks[this.index];
+            var eventBlock = block.blockInfo.hasOwnProperty("eventBlock") && block.blockInfo.eventBlock;
+            if (this.index === 0 && !eventBlock) {
+                if (!this.hasOwnProperty("warnScriptDoesNotStartWithEventBlock")) {
+                    console.log("Warning: Script does not start with event block, so skipping.");
+                    this.warnScriptDoesNotStartWithEventBlock = true;
+                }
+                return;
+            }
+
+            // always run event block at start of script in case the event becomes true again.
+            var prevIndex = this.index;
+            this.index = 0;
             block = _blocks[this.index];
             block.tick();
-        }
-        
-        // If we're at the end, reset
-        if (this.index === _blocks.length) {
-            this.reset();
+            if (this.index === 0) {
+                // event is not true. continue.
+                this.index = prevIndex;
+                this.yield = false;
+            } else {
+                // event was true - reset script and continue.
+                var prevIndex = this.index;
+                this.reset();
+                this.index = prevIndex;
+            }
+
+            // Keep executing statements until yield is true or we hit the end of the script
+            while (!this.yield && this.index < _blocks.length) {
+                block = _blocks[this.index];
+                block.tick();
+            }
+
+            // If we're at the end, reset
+            if (this.index === _blocks.length) {
+                this.reset();
+            }
+        } catch (e) {
+            this.scriptHasError = true;
+            console.log("Script has error. Disabling.");
+            throw e;
         }
     };
 };
@@ -1344,9 +1364,9 @@ PodJS.ConstantBlock = function(blockContext, value) {
         description : "Returns a constant number or string.",
         parameterInfo : [],
         returnsValue : true,
-        compatibleWith : function(resource) { return true; },
+        compatibleWith : function(resource) { return true; }
     };
-    this.tick = function(context) {
+    this.tick = function() {
         console.log("constant " + value);
         return value;
     };
@@ -1368,7 +1388,7 @@ PodJS.FunctionBlock = function(blockContext, fn) {
         returnsValue : true,
         compatibleWith : function(resource) { return true; },
     };
-    this.tick = function(context) {
+    this.tick = function() {
         var value = fn.call(); 
         console.log("function " + value);
         return value;
