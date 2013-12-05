@@ -480,6 +480,35 @@ PodJS.ScratchPod = function(options) {
                 }
             },
             {
+                blockType : "repeat_until",
+                description : "Blocks held inside this block will loop until the specified boolean statement is true, " +
+                    "in which case the code beneath the block (if any) will execute.",
+                parameterInfo : [
+                    { name : "condition" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                reset : function(context) {
+                },
+                tick : function(context) {
+                    var ipOfRepeatUntil = context.blockScript.index;
+                    var condition = truthy(context.blockScript.nextArgument());
+                    context.blockScript.nextBlock();
+                    console.log("repeat_until " + condition);
+                    if (condition) {
+                        context.blockScript.skipBeginEndBlock();
+                    } else {
+                        var beginIP = context.blockScript.index;
+                        context.blockScript.index = ipOfRepeatUntil;
+                        context.blockScript.pushIP();
+                        context.blockScript.index = beginIP;
+                    }
+                    context.blockScript.yield = true;
+                }
+            },
+            {
                 blockType : "wait",
                 description : "pauses its script for the specified amount of seconds - the wait can also be a decimal number.",
                 parameterInfo : [
