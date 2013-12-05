@@ -156,6 +156,17 @@ PodJS.ScratchPod = function(options) {
      * @memberof PodJS.ScratchPod
      */
     var _broadcastMessages = {};
+    
+    /**
+     * Returns true if the value provided should be considered true, or false if not.
+     * 
+     * @private
+     * @instance
+     * @memberof PodJS.ScratchPod
+     */
+    var truthy = function(val) {
+        return String(val) === "true";
+    };
 
     /**
      * Part of the Pod standard interface - return information about the blocks provided
@@ -428,6 +439,30 @@ PodJS.ScratchPod = function(options) {
                     } else {
                         context.blockScript.yield = true;
                     }
+                }
+            },
+            {
+                blockType : "wait_until",
+                description : "The block pauses its script until the specified boolean condition is true.",
+                parameterInfo : [
+                    { name : "condition" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                reset : function(context) {
+                },
+                tick : function(context) {
+                    var ip = context.blockScript.index;
+                    var condition = truthy(context.blockScript.nextArgument());
+                    console.log("wait_until " + condition);
+                    if (condition) {
+                        context.blockScript.nextBlock();
+                    } else {
+                        context.blockScript.index = ip;
+                    }
+                    context.blockScript.yield = true;
                 }
             },
 
