@@ -712,9 +712,11 @@ PodJS.Script = function(context) {
             }
 
             // Keep executing statements until yield is true or we hit the end of the script
-            while (!this.yield && this.index < _blocks.length) {
+            var blocksRemainingBeforeForcedYield = 32;
+            while (!this.yield && this.index < _blocks.length && blocksRemainingBeforeForcedYield > 0) {
                 block = _blocks[this.index];
                 block.tick();
+                blocksRemainingBeforeForcedYield--;
             }
 
             // If we're at the end, reset
@@ -723,7 +725,8 @@ PodJS.Script = function(context) {
             }
         } catch (e) {
             this.scriptHasError = true;
-            console.log("Script has error. Disabling.");
+            console.log("Script has an error. Disabling.");
+            this.reset();
             throw e;
         }
     };
