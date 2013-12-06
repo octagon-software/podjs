@@ -774,6 +774,51 @@ PodJS.ScratchPod = function(options) {
             //////////////////////////////////////////////////////////////
             // Data Blocks
             {
+                blockType : "change_by",
+                description : "The block will change the specified variable by the given amount. If the variable is a " +
+                    "string and not a number, the variable will be set to the amount that the block was supposed to " +
+                    "change the variable by",
+                parameterInfo : [
+                    { name : "variable" },
+                    { name : "delta" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite" || resource.resourceType === "stage";
+                },
+                tick : function(context) {
+                    var resource = context.resource;
+                    var variable = context.blockScript.nextArgument();
+                    var delta = context.blockScript.nextArgument();
+                    if (typeof(delta) !== "number") {
+                        throw new Error("For change_by block, delta must be a number.");
+                    }
+                    
+                    var oldValue;
+                    var newValue;
+                    if (resource.resourceType === "sprite" && resource.hasVariable(variable)) {
+                        var sprite = resource;
+                        oldValue = sprite.getVariable(variable);
+                        if (typeof(oldValue) === "string") {
+                            oldValue = 0;
+                        }
+                        newValue = oldValue + delta;
+                        sprite.setVariable(variable, newValue);
+                    } else if (ScratchPod_this.hasVariable(variable)) {
+                        oldValue = ScratchPod_this.getVariable(variable);
+                        if (typeof(oldValue) === "string") {
+                            oldValue = 0;
+                        }
+                        newValue = oldValue + delta;
+                        ScratchPod_this.setVariable(variable, newValue);
+                    } else {
+                        throw new Error("Variable '" + variable + "' is not defined.");
+                    }
+                    context.blockScript.nextBlock();
+                    console.log("change_by " + variable + " " + oldValue + " + " + delta + " == " + newValue);
+                }
+            },
+            {
                 blockType : "set_to",
                 description : "The block will set the specified variable to the given value: a string or number",
                 parameterInfo : [
