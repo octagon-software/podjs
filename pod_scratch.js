@@ -158,6 +158,15 @@ PodJS.ScratchPod = function(options) {
     var _broadcastMessages = {};
     
     /**
+     * Global variables that apply to all sprites.
+     * 
+     * @private
+     * @instance
+     * @memberof PodJS.ScratchPod
+     */
+    var _variables = {};
+    
+    /**
      * Returns true if the value provided should be considered true, or false if not.
      * 
      * @private
@@ -166,6 +175,68 @@ PodJS.ScratchPod = function(options) {
      */
     var truthy = function(val) {
         return String(val) === "true";
+    };
+
+    /**
+     * Create a new variable for all sprites with the given name.
+     * 
+     * @instance
+     * @method createVariable
+     * @param {string} name the name of the variable
+     * @memberof PodJS.ScratchPod
+     */
+    this.createVariable = function(name) {
+        if (_variables.hasOwnProperty(name)) {
+            throw "All Sprites already has a variable called '" + name + "'";
+        }
+        var variable = new Variable();
+        _variables[name] = variable;
+    };
+
+    /**
+     * Set the value of the given variable to the given value.
+     * 
+     * @instance
+     * @method setVariable
+     * @param {string} name the name of the variable
+     * @param {number|string} value the value to set the variable to
+     * @memberof PodJS.ScratchPod
+     */
+    this.setVariable = function(name, value) {
+        if (!_variables.hasOwnProperty(name)) {
+            throw "All Sprites does not have a variable called '" + name + "'";
+        }
+        _variables[name].value = value;
+    };
+
+    /**
+     * Get the value of the given variable.
+     * 
+     * @instance
+     * @method getVariable
+     * @param {string} name the name of the variable
+     * @return The value of the variable.
+     * @memberof PodJS.ScratchPod
+     */
+    this.getVariable = function(name) {
+        if (!_variables.hasOwnProperty(name)) {
+            throw "Sprite does not have a variable called '" + name + "'";
+        }
+        return _variables[name].value;
+    };
+
+
+    /**
+     * Returns true if the variable exists for all sprites, or false if not.
+     * 
+     * @instance
+     * @method hasVariable
+     * @param {string} name the name of the variable
+     * @return {boolean} true if the variable exists or false if not.
+     * @memberof PodJS.ScratchPod
+     */
+    this.hasVariable = function(name) {
+        return _variables.hasOwnProperty(name);
     };
 
     /**
@@ -698,6 +769,37 @@ PodJS.ScratchPod = function(options) {
                     console.log("random_from_to " + from + " to " + to + " == " + result);
                     return result;
                 }
+            },
+
+            //////////////////////////////////////////////////////////////
+            // Data Blocks
+            {
+                blockType : "set_to",
+                description : "The block will set the specified variable to the given value: a string or number",
+                parameterInfo : [
+                    { name : "variable" },
+                    { name : "value" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite" || resource.resourceType === "stage";
+                },
+                tick : function(context) {
+                    var resource = context.resource;
+                    var variable = context.blockScript.nextArgument();
+                    var value = context.blockScript.nextArgument();
+                    
+                    if (resource.resourceType === "sprite" && resource.hasVariable(variable)) {
+                        var sprite = resource;
+                        sprite.setVariable(variable, value);
+                    } else if (ScratchPod_this.hasVariable(variable)) {
+                        ScratchPod_this.setVariable(variable, value);
+                    } else {
+                        throw new Error("Variable '" + variable + "' is not defined.");
+                    }
+                    context.blockScript.nextBlock();
+                    console.log("set_to " + variable + " '" + value + "'");
+                }
             }
             
         ];
@@ -734,7 +836,7 @@ PodJS.ScratchPod = function(options) {
      * @return A new Sprite instance
      */
     var createSprite = function(parentObject) {
-        // Private Backdrop class
+        // Private Costume class
         var Costume = function(src) {
             var _easelBitmap;
 
@@ -753,6 +855,16 @@ PodJS.ScratchPod = function(options) {
             construct();
         };
         
+        // Private Variable class
+        var Variable = function(name) {
+            /**
+             * @instance
+             * @member {number|string} value
+             * @memberof PodJS.ScratchPod#Variable
+             */
+            this.value = 0;
+        };
+        
         /**
          * @class PodJS.ScratchPod.Sprite
          * @classdesc Model for the Scratch Sprite class
@@ -760,6 +872,7 @@ PodJS.ScratchPod = function(options) {
         var Sprite = function() {
             var Sprite_this = this;
             var _costumes = {};
+            var _variables = {};
             var _currentCostume = null;
             var _show = true;
             var _x = 0;
@@ -773,6 +886,67 @@ PodJS.ScratchPod = function(options) {
              * @memberof PodJS.ScratchPod.Sprite
              */
             this.lastClickTime = 0;
+
+            /**
+             * Create a new variable with the given name.
+             * 
+             * @instance
+             * @method createVariable
+             * @param {string} name the name of the variable
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.createVariable = function(name) {
+                if (_variables.hasOwnProperty(name)) {
+                    throw "Sprite already has a variable called '" + name + "'";
+                }
+                var variable = new Variable();
+                _variables[name] = variable;
+            };
+
+            /**
+             * Set the value of the given variable to the given value.
+             * 
+             * @instance
+             * @method setVariable
+             * @param {string} name the name of the variable
+             * @param {number|string} value the value to set the variable to
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.setVariable = function(name, value) {
+                if (!_variables.hasOwnProperty(name)) {
+                    throw "Sprite does not have a variable called '" + name + "'";
+                }
+                _variables[name].value = value;
+            };
+
+            /**
+             * Get the value of the given variable.
+             * 
+             * @instance
+             * @method getVariable
+             * @param {string} name the name of the variable
+             * @return The value of the variable.
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.getVariable = function(name) {
+                if (!_variables.hasOwnProperty(name)) {
+                    throw "Sprite does not have a variable called '" + name + "'";
+                }
+                return _variables[name].value;
+            };
+
+            /**
+             * Returns true if the variable exists for this sprite, or false if not.
+             * 
+             * @instance
+             * @method hasVariable
+             * @param {string} name the name of the variable
+             * @return {boolean} true if the variable exists or false if not.
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.hasVariable = function(name) {
+                return _variables.hasOwnProperty(name);
+            };
 
             /**
              * Load and register a new costume for this sprite.
@@ -840,7 +1014,7 @@ PodJS.ScratchPod = function(options) {
              * 
              * @instance
              * @method setShown
-             * @param {boolean} true if this is to be shown or false if not.
+             * @param {boolean} show true if this is to be shown or false if not.
              * @memberof PodJS.ScratchPod.Sprite
              */
             this.setShown = function(show) {
