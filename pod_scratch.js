@@ -166,6 +166,139 @@ PodJS.ScratchPod = function(options) {
      */
     var _variables = {};
     
+    // Private Variable class
+    var Variable = function(spriteName, variableName) {
+        /**
+         * HTML DOM element for rendering the variable
+         *
+         * @instance
+         * @member {HTMLElement} _varDiv
+         * @memberof PodJS.ScratchPod#Variable
+         */
+        var _varDiv = document.createElement("div");
+
+        /**
+         * HTML DOM element for rendering the variable value
+         *
+         * @instance
+         * @member {HTMLElement} _valueDiv
+         * @memberof PodJS.ScratchPod#Variable
+         */
+        var _valueSpan = document.createElement("span");
+
+        /**
+         * CreateJS Container for the visual display of this variable, if shown.
+         *
+         * @instance
+         * @member {createjs.DOMElement} _createJSDOMElement
+         * @memberof PodJS.ScratchPod#Variable
+         */
+        var _createJSDOMElement = new createjs.DOMElement(_varDiv);
+
+        /**
+         * @instance
+         * @member {number|string} value
+         * @memberof PodJS.ScratchPod#Variable
+         */
+        var _value = 0;
+        Object.defineProperty(this, "value", {
+            get : function() {
+                return _value;
+            },
+            set : function(value) {
+                _value = value;
+                _valueSpan.innerHTML = escape(String(_value));
+            }
+        });
+        
+        /**
+         * True if the variable can be seen on the stage, or false if it is hidden.
+         * @instance
+         * @member {boolean} hidden
+         * @memberof PodJS.ScratchPod#Variable
+         */
+        var _shown = false;
+        Object.defineProperty(this, "shown", {
+            get : function() {
+                return _shown;
+            },
+            set : function(value) {
+                _shown = value;
+                if (value) {
+                    _easelStage.addChild(_createJSDOMElement);
+                    _varDiv.style.visibility = "visible";
+                } else {
+                    _easelStage.removeChild(_createJSDOMElement);
+                    _varDiv.style.visibility = "hidden";
+                }
+            }
+        });
+
+        /**
+         * X position of the variable on the stage, when shown.
+         *
+         * @instance
+         * @member {number} x
+         * @memberof PodJS.ScratchPod#Variable
+         */
+        var _x = 0;
+        Object.defineProperty(this, "x", {
+            get : function() {
+                return _x;
+            },
+            set : function(value) {
+                _x = value;
+                _createJSDOMElement.x = value;
+            }
+        });
+
+        /**
+         * Y position of the variable on the stage, when shown.
+         *
+         * @instance
+         * @member {number} y
+         * @memberof PodJS.ScratchPod#Variable
+         */
+        var _y = 0;
+        Object.defineProperty(this, "y", {
+            get : function() {
+                return _y;
+            },
+            set : function(value) {
+                _y = value;
+                _createJSDOMElement.y = value;
+            }
+        });
+        
+        var construct = function() {
+            // mimic the style of Scratch's variable display but use a DOM object.
+            _varDiv.innerHTML = ((spriteName === null) ? "" : (spriteName + ": ")) + variableName;
+            _varDiv.style.zIndex = 100;
+            _varDiv.style.padding = "2px 6px";
+            _varDiv.style.border = "1px solid #949191";
+            _varDiv.style.background = "#c1c4c7";
+            _varDiv.style.fontWeight = "bold";
+            _varDiv.style.fontFamily = "sans-serif";
+            _varDiv.style.borderRadius = "4px";
+            _varDiv.style.fontSize = "10pt";
+            _varDiv.style.visibility = "hidden";
+            _stageDiv.insertBefore(_varDiv, _stageDiv.firstChild);
+            
+            _valueSpan.innerHTML = "0";
+            _valueSpan.style.marginLeft = "6px";
+            _valueSpan.style.background = "#ee7d16";
+            _valueSpan.style.color = "#ffffff";
+            _valueSpan.style.minWidth = "34px";
+            _valueSpan.style.padding = "0px 4px";
+            _valueSpan.style.border = "1px solid #ffffff";
+            _valueSpan.style.borderRadius = "4px";
+            _valueSpan.style.float = "right";
+            _valueSpan.style.textAlign = "center";
+            _varDiv.appendChild(_valueSpan);
+        };
+        construct();
+    };
+
     /**
      * Returns true if the value provided should be considered true, or false if not.
      * 
@@ -175,6 +308,33 @@ PodJS.ScratchPod = function(options) {
      */
     var truthy = function(val) {
         return String(val) === "true";
+    };
+
+    /**
+     * Automatically set the starting position of the variable when shown.
+     * 
+     * @instance
+     * @method _autoPositionVariable
+     * @param {PodJS.ScratchPod.Variable} The variable to position.
+     * @memberof PodJS.ScratchPod
+     */
+    var _autoPositionVariable = function(variable) {
+        // Count how many variables there are so far.
+        var varCount = 0;
+        for (var name in _variables) {
+            if (_variables.hasOwnProperty(name)) {
+                varCount++;
+            }
+        }
+        var sprites = ScratchPod_this.getAllResources()["sprite"];
+        for (var spriteName in sprites) {
+            if (sprites.hasOwnProperty(spriteName)) {
+                var sprite = sprites[spriteName];
+                varCount += sprite.getVariableNames().length;
+            }
+        }
+        variable.x = -230;
+        variable.y = -170 + varCount * 30;
     };
 
     /**
@@ -189,7 +349,8 @@ PodJS.ScratchPod = function(options) {
         if (_variables.hasOwnProperty(name)) {
             throw "All Sprites already has a variable called '" + name + "'";
         }
-        var variable = new Variable();
+        var variable = new Variable(null, name);
+        _autoPositionVariable(variable);
         _variables[name] = variable;
     };
 
@@ -207,6 +368,35 @@ PodJS.ScratchPod = function(options) {
             throw "All Sprites does not have a variable called '" + name + "'";
         }
         _variables[name].value = value;
+    };
+
+    /**
+     * Sets whether this variable is shown on the stage, and the location at which it is shown.
+     * 
+     * @instance
+     * @method showVariable
+     * @param {string} name the name of the variable
+     * @param {boolean} shown true if the variable is to be shown, or false if not. Optional, defaults to true.
+     * @param {number} x x position of the variable on the stage (optional, defaults to 0)
+     * @param {number} y y position of the variable on the stage (optional, defaults to 0)
+     * @memberof PodJS.ScratchPod
+     */
+    this.showVariable = function(name, shown, x, y) {
+        if (typeof(shown) === "undefined") {
+            shown = true;
+        }
+        if (typeof(x) === "undefined") {
+            x = 0;
+        }
+        if (typeof(y) === "undefined") {
+            y = 0;
+        }
+        if (!_variables.hasOwnProperty(name)) {
+            throw "All Sprites does not have a variable called '" + name + "'";
+        }
+        _variables[name].shown = shown;
+        _variables[name].x = x;
+        _variables[name].y = y;
     };
 
     /**
@@ -819,6 +1009,32 @@ PodJS.ScratchPod = function(options) {
                 }
             },
             {
+                blockType : "hide_variable",
+                description : "Hides the specified variable's Stage monitor.",
+                parameterInfo : [
+                    { name : "variable" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite" || resource.resourceType === "stage";
+                },
+                tick : function(context) {
+                    var resource = context.resource;
+                    var variable = context.blockScript.nextArgument();
+                    
+                    if (resource.resourceType === "sprite" && resource.hasVariable(variable)) {
+                        var sprite = resource;
+                        sprite.showVariable(variable, false);
+                    } else if (ScratchPod_this.hasVariable(variable)) {
+                        ScratchPod_this.showVariable(variable, false);
+                    } else {
+                        throw new Error("Variable '" + variable + "' is not defined.");
+                    }
+                    context.blockScript.nextBlock();
+                    console.log("hide_variable " + variable);
+                }
+            },
+            {
                 blockType : "set_to",
                 description : "The block will set the specified variable to the given value: a string or number",
                 parameterInfo : [
@@ -844,6 +1060,32 @@ PodJS.ScratchPod = function(options) {
                     }
                     context.blockScript.nextBlock();
                     console.log("set_to " + variable + " '" + value + "'");
+                }
+            },
+            {
+                blockType : "show_variable",
+                description : "Shows the specified variable's Stage monitor.",
+                parameterInfo : [
+                    { name : "variable" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite" || resource.resourceType === "stage";
+                },
+                tick : function(context) {
+                    var resource = context.resource;
+                    var variable = context.blockScript.nextArgument();
+                    
+                    if (resource.resourceType === "sprite" && resource.hasVariable(variable)) {
+                        var sprite = resource;
+                        sprite.showVariable(variable, true);
+                    } else if (ScratchPod_this.hasVariable(variable)) {
+                        ScratchPod_this.showVariable(variable, true);
+                    } else {
+                        throw new Error("Variable '" + variable + "' is not defined.");
+                    }
+                    context.blockScript.nextBlock();
+                    console.log("show_variable " + variable);
                 }
             }
             
@@ -878,9 +1120,10 @@ PodJS.ScratchPod = function(options) {
      * @instance
      * @method createSprite
      * @param parentObject The resource super-object from PodJS
+     * @param spriteName The name of the sprite
      * @return A new Sprite instance
      */
-    var createSprite = function(parentObject) {
+    var createSprite = function(parentObject, spriteName) {
         // Private Costume class
         var Costume = function(src) {
             var _easelBitmap;
@@ -900,21 +1143,11 @@ PodJS.ScratchPod = function(options) {
             construct();
         };
         
-        // Private Variable class
-        var Variable = function(name) {
-            /**
-             * @instance
-             * @member {number|string} value
-             * @memberof PodJS.ScratchPod#Variable
-             */
-            this.value = 0;
-        };
-        
         /**
          * @class PodJS.ScratchPod.Sprite
          * @classdesc Model for the Scratch Sprite class
          */
-        var Sprite = function() {
+        var Sprite = function(spriteName) {
             var Sprite_this = this;
             var _costumes = {};
             var _variables = {};
@@ -944,7 +1177,8 @@ PodJS.ScratchPod = function(options) {
                 if (_variables.hasOwnProperty(name)) {
                     throw "Sprite already has a variable called '" + name + "'";
                 }
-                var variable = new Variable();
+                var variable = new Variable(spriteName, name);
+                _autoPositionVariable(variable);
                 _variables[name] = variable;
             };
 
@@ -981,6 +1215,24 @@ PodJS.ScratchPod = function(options) {
             };
 
             /**
+             * Returns the names of all the variables for this sprite.
+             * 
+             * @instance
+             * @method getVariableNames
+             * @return {string[]} The names of all the variables
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.getVariableNames = function() {
+                var result = [];
+                for (var name in _variables) {
+                    if (_variables.hasOwnProperty(name)) {
+                        result.push(name);
+                    }
+                }
+                return result;
+            };
+
+            /**
              * Returns true if the variable exists for this sprite, or false if not.
              * 
              * @instance
@@ -991,6 +1243,33 @@ PodJS.ScratchPod = function(options) {
              */
             this.hasVariable = function(name) {
                 return _variables.hasOwnProperty(name);
+            };
+
+            /**
+             * Sets whether this variable is shown on the stage, and the location at which it is shown.
+             * 
+             * @instance
+             * @method showVariable
+             * @param {string} name the name of the variable
+             * @param {boolean} shown true if the variable is to be shown, or false if not. Optional, defaults to true.
+             * @param {number} x x position of the variable on the stage (optional, defaults to 0)
+             * @param {number} y y position of the variable on the stage (optional, defaults to 0)
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.showVariable = function(name, shown, x, y) {
+                if (typeof(shown) === "undefined") {
+                    shown = true;
+                }
+                if (typeof(x) !== "undefined") {
+                    _variables[name].x = x;
+                }
+                if (typeof(y) !== "undefined") {
+                    _variables[name].y = y;
+                }
+                if (!_variables.hasOwnProperty(name)) {
+                    throw "Sprite does not have a variable called '" + name + "'";
+                }
+                _variables[name].shown = shown;
             };
 
             /**
@@ -1130,7 +1409,7 @@ PodJS.ScratchPod = function(options) {
             };
         };
         Sprite.prototype = parentObject;
-        var result = new Sprite();
+        var result = new Sprite(spriteName);
         result.register(result);
         return result;
     };
@@ -1237,7 +1516,7 @@ PodJS.ScratchPod = function(options) {
         var resource = Object.create(resourceBase);
         
         if (resourceType === "sprite") {
-            result = createSprite(resource);
+            result = createSprite(resource, resourceName);
         } else if (resourceType === "stage") {
             result = createStage(resource);
         } else {
