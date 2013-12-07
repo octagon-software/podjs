@@ -1482,6 +1482,50 @@ PodJS.ScratchPod = function(options) {
                 }
             },
             {
+                blockType : "delete_of",
+                description : "Delete the item at the given index (1-based), the last item (pass in the word 'last'), or " +
+                    "all items (pass in the word 'all') of the specified list depending on the option selected.",
+                parameterInfo : [
+                    { name : "what" },
+                    { name : "listVariable" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite" || resource.resourceType === "stage";
+                },
+                tick : function(context) {
+                    var resource = context.resource;
+                    var what = context.blockScript.nextArgument();
+                    var listVariable = context.blockScript.nextArgument();
+                    
+                    var list = null;
+                    if (resource.resourceType === "sprite" && resource.hasListVariable(listVariable)) {
+                        var sprite = resource;
+                        list = sprite.getListVariable(listVariable);
+                    } else if (ScratchPod_this.hasListVariable(listVariable)) {
+                        list = ScratchPod_this.getListVariable(listVariable);
+                    } else {
+                        throw new Error("List variable '" + listVariable + "' is not defined.");
+                    }
+                    if (list !== null) {
+                        if (what === "all") {
+                            list.deleteAll();
+                        } else if (what === "last") {
+                            if (list.length() > 0) {
+                                list.deleteAt(list.length() - 1);
+                            }
+                        } else {
+                            var index = Number(what) - 1;
+                            if (index >= 0 && index <= list.length()) {
+                                list.deleteAt(index);
+                            }
+                        }
+                    }
+                    context.blockScript.nextBlock();
+                    console.log("delete_of " + what + " " + listVariable);
+                }
+            },
+            {
                 blockType : "hide_list",
                 description : "Hides the specified list variable's Stage monitor.",
                 parameterInfo : [
