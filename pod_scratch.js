@@ -166,6 +166,41 @@ PodJS.ScratchPod = function(options) {
      */
     var _variables = {};
     
+    /**
+     * Global list variables that apply to all sprites.
+     * 
+     * @private
+     * @instance
+     * @memberof PodJS.ScratchPod
+     */
+    var _listVariables = {};
+
+    /**
+     * Sanitize HTML
+     * Source: http://stackoverflow.com/questions/295566/sanitize-rewrite-html-on-the-client-side
+     */
+    var _htmlEscape = function(html) {
+        var tagBody = '(?:[^"\'>]|"[^"]*"|\'[^\']*\')*';
+        var tagOrComment = new RegExp(
+            '<(?:'
+            // Comment body.
+            + '!--(?:(?:-*[^->])*--+|-?)'
+            // Special "raw text" elements whose content should be elided.
+            + '|script\\b' + tagBody + '>[\\s\\S]*?</script\\s*'
+            + '|style\\b' + tagBody + '>[\\s\\S]*?</style\\s*'
+            // Regular name
+            + '|/?[a-z]'
+            + tagBody
+            + ')>',
+            'gi');
+        var oldHtml;
+        do {
+            oldHtml = html;
+            html = html.replace(tagOrComment, '');
+        } while (html !== oldHtml);
+        return html.replace(/</g, '&lt;');
+    };
+    
     // Private Variable class
     var Variable = function(spriteName, variableName) {
         /**
@@ -207,7 +242,7 @@ PodJS.ScratchPod = function(options) {
             },
             set : function(value) {
                 _value = value;
-                _valueSpan.innerHTML = escape(String(_value));
+                _valueSpan.innerHTML = _htmlEscape(String(_value));
             }
         });
         
@@ -273,28 +308,343 @@ PodJS.ScratchPod = function(options) {
         var construct = function() {
             // mimic the style of Scratch's variable display but use a DOM object.
             _varDiv.innerHTML = ((spriteName === null) ? "" : (spriteName + ": ")) + variableName;
-            _varDiv.style.zIndex = 100;
-            _varDiv.style.padding = "2px 6px";
-            _varDiv.style.border = "1px solid #949191";
-            _varDiv.style.background = "#c1c4c7";
-            _varDiv.style.fontWeight = "bold";
-            _varDiv.style.fontFamily = "sans-serif";
-            _varDiv.style.borderRadius = "4px";
-            _varDiv.style.fontSize = "10pt";
-            _varDiv.style.visibility = "hidden";
+            _varDiv.className = "podjs_scratch_var_div";
             _stageDiv.insertBefore(_varDiv, _stageDiv.firstChild);
-            
             _valueSpan.innerHTML = "0";
-            _valueSpan.style.marginLeft = "6px";
-            _valueSpan.style.background = "#ee7d16";
-            _valueSpan.style.color = "#ffffff";
-            _valueSpan.style.minWidth = "34px";
-            _valueSpan.style.padding = "0px 4px";
-            _valueSpan.style.border = "1px solid #ffffff";
-            _valueSpan.style.borderRadius = "4px";
-            _valueSpan.style.float = "right";
-            _valueSpan.style.textAlign = "center";
+            _valueSpan.className = "podjs_scratch_var_value";
             _varDiv.appendChild(_valueSpan);
+        };
+        construct();
+    };
+
+    /**
+     * @class
+     * @classdesc List variable containing both the list contents and the display.
+     */
+    this.ListVariable = function(spriteName, listVariableName) {
+        /**
+         * HTML DOM element for rendering the list variable
+         *
+         * @instance
+         * @member {HTMLElement} _varDiv
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        var _varDiv = document.createElement("div");
+
+        /**
+         * HTML DOM element for rendering the list variable
+         *
+         * @instance
+         * @member {HTMLElement} _valueDiv
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        var _valueDiv = document.createElement("div");
+
+        /**
+         * HTML DOM element for rendering the list variable
+         *
+         * @instance
+         * @member {HTMLElement} _domList
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        var _domList = document.createElement("ul");
+
+        /**
+         * HTML DOM element for rendering the list length
+         *
+         * @instance
+         * @member {HTMLElement} _lengthSpan
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        var _lengthDiv = document.createElement("div");
+
+        /**
+         * CreateJS Container for the visual display of this list variable, if shown.
+         *
+         * @instance
+         * @member {createjs.DOMElement} _createJSDOMElement
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        var _createJSDOMElement = new createjs.DOMElement(_varDiv);
+
+        /**
+         * @instance
+         * @member {object[]} value
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        var _list = [];
+        
+        /**
+         * True if the list variable can be seen on the stage, or false if it is hidden.
+         * @instance
+         * @member {boolean} hidden
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        var _shown = false;
+        Object.defineProperty(this, "shown", {
+            get : function() {
+                return _shown;
+            },
+            set : function(value) {
+                _shown = value;
+                if (value) {
+                    _easelStage.addChild(_createJSDOMElement);
+                    _varDiv.style.visibility = "visible";
+                } else {
+                    _easelStage.removeChild(_createJSDOMElement);
+                    _varDiv.style.visibility = "hidden";
+                }
+            }
+        });
+
+        /**
+         * X position of the list variable on the stage, when shown.
+         *
+         * @instance
+         * @member {number} x
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        var _x = 0;
+        Object.defineProperty(this, "x", {
+            get : function() {
+                return _x;
+            },
+            set : function(value) {
+                _x = value;
+                _createJSDOMElement.x = value;
+            }
+        });
+
+        /**
+         * Y position of the list variable on the stage, when shown.
+         *
+         * @instance
+         * @member {number} y
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        var _y = 0;
+        Object.defineProperty(this, "y", {
+            get : function() {
+                return _y;
+            },
+            set : function(value) {
+                _y = value;
+                _createJSDOMElement.y = value;
+            }
+        });
+
+        /**
+         * Width of the list variable on the stage, when shown.
+         *
+         * @instance
+         * @member {number} width
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        var _width = null;
+        Object.defineProperty(this, "width", {
+            get : function() {
+                return _width;
+            },
+            set : function(value) {
+                _width = value;
+                if (value !== null) {
+                    _varDiv.style.width = Number(value) + "px";
+                }
+            }
+        });
+
+        /**
+         * Height of the list variable on the stage, when shown.
+         *
+         * @instance
+         * @member {number} height
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        var _height = null;
+        Object.defineProperty(this, "height", {
+            get : function() {
+                return _height;
+            },
+            set : function(value) {
+                _height = value;
+                if (value !== null) {
+                    _varDiv.style.height = Number(value) + "px";
+                }
+            }
+        });
+
+        /**
+         * Create the DOM list item for an item of the list.
+         *
+         * @private
+         * @instance
+         * @method _createListItem
+         * @param {string|number} value The value to display
+         * @return {HTMLElement} A list item HTML element.
+         */
+        var _createListItem = function(value) {
+            var li = document.createElement("li");
+            li.className = "podjs_scratch_list_var_item";
+            
+            var span = document.createElement("span");
+            span.className = "podjs_scratch_list_var_item_span";
+            span.innerHTML = _htmlEscape(String(value));
+            li.appendChild(span);
+            _updateLength();
+            return li;
+        };
+
+        /**
+         * Update the display of the length of this list.
+         * 
+         * @private
+         * @instance
+         * @method _updateLength
+         */
+        var _updateLength = function() {
+            _lengthDiv.innerHTML = "length: " + _list.length;
+        };
+
+        /**
+         * Add an item to the end of the list
+         * 
+         * @instance
+         * @method add
+         * @param {number|string} value The item to add to the list
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        this.add = function(value) {
+            _list.push(value);
+            var li = _createListItem(value);
+            _domList.appendChild(li);
+            _updateLength();
+        };
+        
+        /**
+         * Delete an item from the list
+         * 
+         * @instance
+         * @method deleteAll
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        this.deleteAll = function() {
+            _list.length = 0;
+            _domList.innerHTML = "";
+            _updateLength();
+        };
+
+        /**
+         * Delete item from the list at the given index
+         * 
+         * @instance
+         * @method deleteAt
+         * @param {number} index The index to delete from, 0-based.
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        this.deleteAt = function(index) {
+            if (index >= 0 && index < _list.length) {
+                _list.splice(index, 1);
+                _domList.removeChild(_domList.childNodes[index]);
+                _updateLength();
+            }
+        };
+        
+        /**
+         * Insert item into the list at the given index
+         * 
+         * @instance
+         * @method insertAt
+         * @param {number|string} value The value to insert into the list
+         * @param {number} index The index to insert at, 0-based. All other items are shifted towards the end of the list.
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        this.insertAt = function(value, index) {
+            if (index >= 0 && index <= _list.length) {
+                var atEnd = index === _list.length;
+                _list.splice(index, 0, value);
+                var li = _createListItem(value);
+                if (atEnd) {
+                    _domList.appendChild(li);
+                } else {
+                    _domList.insertBefore(li, _domList.childNodes[index]);
+                }
+                _updateLength();
+            }
+        };
+        
+        /**
+         * Replace item at the given index
+         * 
+         * @instance
+         * @method replaceAt
+         * @param {number|string} value The value to replace in the list
+         * @param {number} index The index to insert at, 0-based.
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        this.replaceAt = function(value, index) {
+            if (index >= 0 && index < _list.length) {
+                _list.splice(index, 1, value);
+                _domList.childNodes[index].getElementsByTagName("span")[0].innerHTML = _htmlEscape(String(value));
+            }
+        };
+        
+        /**
+         * Return item at the given index
+         * 
+         * @instance
+         * @method getAt
+         * @param {number} index The index of the element to retrieve
+         * @return {number|string} The value at the given index in the list.
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        this.getAt = function(index) {
+            var result = "";
+            if (index >= 0 && index < _list.length) {
+                result = _list[index];
+            }
+            return result;
+        };
+        
+        /**
+         * Returns the list of the list
+         * 
+         * @instance
+         * @method length
+         * @return {number} The number of items in the list
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        this.length = function() {
+            return _list.length;
+        };
+
+        /**
+         * Returns true if the list contains the given item, or false if not.
+         * 
+         * @instance
+         * @method length
+         * @param {number|string} value The item to check the list for
+         * @return {boolean} true if the list contains the item or false if not.
+         * @memberof PodJS.ScratchPod#ListVariable
+         */
+        this.contains = function(value) {
+            return _list.indexOf(value) !== -1;
+        };
+        
+        var construct = function() {
+            // mimic the style of Scratch's variable display but use a DOM object.
+            _varDiv.innerHTML = ((spriteName === null) ? "" : (spriteName + ": ")) + listVariableName;
+            _varDiv.className = "podjs_scratch_list_var";
+            _stageDiv.insertBefore(_varDiv, _stageDiv.firstChild);
+
+            _domList.className = "podjs_scratch_list_var_list";
+            _varDiv.appendChild(_valueDiv);
+            
+            _valueDiv.className = "podjs_scratch_list_value_div";
+            _valueDiv.appendChild(_domList);
+            
+            _lengthDiv.className = "podjs_scratch_list_var_length_div";
+            _updateLength();
+            _varDiv.appendChild(_lengthDiv);
         };
         construct();
     };
@@ -304,37 +654,50 @@ PodJS.ScratchPod = function(options) {
      * 
      * @private
      * @instance
+     * @param val The value to evaluate for truthiness.
      * @memberof PodJS.ScratchPod
      */
     var truthy = function(val) {
         return String(val) === "true";
     };
 
+
     /**
      * Automatically set the starting position of the variable when shown.
      * 
      * @instance
      * @method _autoPositionVariable
-     * @param {PodJS.ScratchPod.Variable} The variable to position.
+     * @param {PodJS.ScratchPod.Variable} variable The variable to position.
      * @memberof PodJS.ScratchPod
      */
+    var _autoVariableX = -230;
+    var _autoVariableY = -170;
     var _autoPositionVariable = function(variable) {
-        // Count how many variables there are so far.
-        var varCount = 0;
-        for (var name in _variables) {
-            if (_variables.hasOwnProperty(name)) {
-                varCount++;
-            }
+        variable.x = _autoVariableX;
+        variable.y = _autoVariableY;
+        _autoVariableY += 30;
+        if (_autoVariableY > 200) {
+            _autoVariableY = -170;
+            _autoVariableX += 100;
         }
-        var sprites = ScratchPod_this.getAllResources()["sprite"];
-        for (var spriteName in sprites) {
-            if (sprites.hasOwnProperty(spriteName)) {
-                var sprite = sprites[spriteName];
-                varCount += sprite.getVariableNames().length;
-            }
+    };
+
+    /**
+     * Automatically set the starting position of the list variable when shown.
+     * 
+     * @instance
+     * @method _autoPositionListVariable
+     * @param {PodJS.ScratchPod.ListVariable} listVariable The list variable to position.
+     * @memberof PodJS.ScratchPod
+     */
+    var _autoPositionListVariable = function(listVariable) {
+        listVariable.x = _autoVariableX;
+        listVariable.y = _autoVariableY;
+        _autoVariableY += 200;
+        if (_autoVariableY > 200) {
+            _autoVariableY = -170;
+            _autoVariableX += 100;
         }
-        variable.x = -230;
-        variable.y = -170 + varCount * 30;
     };
 
     /**
@@ -352,6 +715,23 @@ PodJS.ScratchPod = function(options) {
         var variable = new Variable(null, name);
         _autoPositionVariable(variable);
         _variables[name] = variable;
+    };
+
+    /**
+     * Create a new list variable for all sprites with the given name.
+     * 
+     * @instance
+     * @method createListVariable
+     * @param {string} name the name of the list variable
+     * @memberof PodJS.ScratchPod
+     */
+    this.createListVariable = function(name) {
+        if (_listVariables.hasOwnProperty(name)) {
+            throw "All Sprites already has a list variable called '" + name + "'";
+        }
+        var listVariable = new ScratchPod_this.ListVariable(null, name);
+        _autoPositionListVariable(listVariable);
+        _listVariables[name] = listVariable;
     };
 
     /**
@@ -400,6 +780,41 @@ PodJS.ScratchPod = function(options) {
     };
 
     /**
+     * Sets whether this list variable is shown on the stage, and the location at which it is shown.
+     * 
+     * @instance
+     * @method showListVariable
+     * @param {string} name the name of the list variable
+     * @param {boolean} shown true if the list variable is to be shown, or false if not. Optional, defaults to true.
+     * @param {number} x x position of the list variable on the stage (optional, defaults to 0)
+     * @param {number} y y position of the list variable on the stage (optional, defaults to 0)
+     * @param {number} width width Width of the box to show (optional, defaults to enough width to show small ints)
+     * @param {number} height height of the box to show (optional, defaults to 8 rows worth of pixels)
+     * @memberof PodJS.ScratchPod
+     */
+    this.showListVariable = function(name, shown, x, y, width, height) {
+        if (typeof(shown) === "undefined") {
+            shown = true;
+        }
+        if (typeof(x) !== "undefined") {
+            _listVariables[name].x = x;
+        }
+        if (typeof(y) !== "undefined") {
+            _listVariables[name].y = y;
+        }
+        if (typeof(width) !== "undefined") {
+            _listVariables[name].width = width;
+        }
+        if (typeof(height) !== "undefined") {
+            _listVariables[name].height = height;
+        }
+        if (!_listVariables.hasOwnProperty(name)) {
+            throw "All Sprites does not have a list variable called '" + name + "'";
+        }
+        _listVariables[name].shown = shown;
+    };
+
+    /**
      * Get the value of the given variable.
      * 
      * @instance
@@ -415,6 +830,21 @@ PodJS.ScratchPod = function(options) {
         return _variables[name].value;
     };
 
+    /**
+     * Get the list variable.
+     * 
+     * @instance
+     * @method getListVariable
+     * @param {string} name the name of the list variable
+     * @return {PodJS.ScratchPod.ListVariable} The list variable.
+     * @memberof PodJS.ScratchPod
+     */
+    this.getListVariable = function(name) {
+        if (!_listVariables.hasOwnProperty(name)) {
+            throw "Sprite does not have a list variable called '" + name + "'";
+        }
+        return _listVariables[name];
+    };
 
     /**
      * Returns true if the variable exists for all sprites, or false if not.
@@ -427,6 +857,19 @@ PodJS.ScratchPod = function(options) {
      */
     this.hasVariable = function(name) {
         return _variables.hasOwnProperty(name);
+    };
+
+    /**
+     * Returns true if the list variable exists for all sprites, or false if not.
+     * 
+     * @instance
+     * @method hasListVariable
+     * @param {string} name the name of the list variable
+     * @return {boolean} true if the list variable exists or false if not.
+     * @memberof PodJS.ScratchPod
+     */
+    this.hasListVariable = function(name) {
+        return _listVariables.hasOwnProperty(name);
     };
 
     /**
@@ -964,6 +1407,36 @@ PodJS.ScratchPod = function(options) {
             //////////////////////////////////////////////////////////////
             // Data Blocks
             {
+                blockType : "add_to",
+                description : "Adds an item to the specified list, the item containing the given text.",
+                parameterInfo : [
+                    { name : "value" },
+                    { name : "listVariable" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite" || resource.resourceType === "stage";
+                },
+                tick : function(context) {
+                    var resource = context.resource;
+                    var value = context.blockScript.nextArgument();
+                    var listVariable = context.blockScript.nextArgument();
+                    
+                    if (resource.resourceType === "sprite" && resource.hasListVariable(listVariable)) {
+                        var sprite = resource;
+                        var list = sprite.getListVariable(listVariable);
+                        list.add(value);
+                    } else if (ScratchPod_this.hasListVariable(listVariable)) {
+                        var list = ScratchPod_this.getListVariable(listVariable);
+                        list.add(value);
+                    } else {
+                        throw new Error("List variable '" + listVariable + "' is not defined.");
+                    }
+                    context.blockScript.nextBlock();
+                    console.log("add_to " + value + " " + listVariable);
+                }
+            },
+            {
                 blockType : "change_by",
                 description : "The block will change the specified variable by the given amount. If the variable is a " +
                     "string and not a number, the variable will be set to the amount that the block was supposed to " +
@@ -1006,6 +1479,32 @@ PodJS.ScratchPod = function(options) {
                     }
                     context.blockScript.nextBlock();
                     console.log("change_by " + variable + " " + oldValue + " + " + delta + " == " + newValue);
+                }
+            },
+            {
+                blockType : "hide_list",
+                description : "Hides the specified list variable's Stage monitor.",
+                parameterInfo : [
+                    { name : "listVariable" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite" || resource.resourceType === "stage";
+                },
+                tick : function(context) {
+                    var resource = context.resource;
+                    var listVariable = context.blockScript.nextArgument();
+                    
+                    if (resource.resourceType === "sprite" && resource.hasListVariable(listVariable)) {
+                        var sprite = resource;
+                        sprite.showListVariable(listVariable, false);
+                    } else if (ScratchPod_this.hasListVariable(listVariable)) {
+                        ScratchPod_this.showListVariable(listVariable, false);
+                    } else {
+                        throw new Error("List variable '" + listVariable + "' is not defined.");
+                    }
+                    context.blockScript.nextBlock();
+                    console.log("hide_list " + listVariable);
                 }
             },
             {
@@ -1060,6 +1559,32 @@ PodJS.ScratchPod = function(options) {
                     }
                     context.blockScript.nextBlock();
                     console.log("set_to " + variable + " '" + value + "'");
+                }
+            },
+            {
+                blockType : "show_list",
+                description : "Shows the specified list's Stage monitor.",
+                parameterInfo : [
+                    { name : "listVariable" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite" || resource.resourceType === "stage";
+                },
+                tick : function(context) {
+                    var resource = context.resource;
+                    var variable = context.blockScript.nextArgument();
+                    
+                    if (resource.resourceType === "sprite" && resource.hasListVariable(variable)) {
+                        var sprite = resource;
+                        sprite.showListVariable(variable, true);
+                    } else if (ScratchPod_this.hasListVariable(variable)) {
+                        ScratchPod_this.showListVariable(variable, true);
+                    } else {
+                        throw new Error("List variable '" + variable + "' is not defined.");
+                    }
+                    context.blockScript.nextBlock();
+                    console.log("show_list " + variable);
                 }
             },
             {
@@ -1151,6 +1676,7 @@ PodJS.ScratchPod = function(options) {
             var Sprite_this = this;
             var _costumes = {};
             var _variables = {};
+            var _listVariables = {};
             var _currentCostume = null;
             var _show = true;
             var _x = 0;
@@ -1180,6 +1706,23 @@ PodJS.ScratchPod = function(options) {
                 var variable = new Variable(spriteName, name);
                 _autoPositionVariable(variable);
                 _variables[name] = variable;
+            };
+
+            /**
+             * Create a new list variable with the given name.
+             * 
+             * @instance
+             * @method createListVariable
+             * @param {string} name the name of the list variable
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.createListVariable = function(name) {
+                if (_listVariables.hasOwnProperty(name)) {
+                    throw "Sprite already has a list variable called '" + name + "'";
+                }
+                var listVariable = new ScratchPod_this.ListVariable(spriteName, name);
+                _autoPositionListVariable(listVariable);
+                _listVariables[name] = listVariable;
             };
 
             /**
@@ -1215,6 +1758,22 @@ PodJS.ScratchPod = function(options) {
             };
 
             /**
+             * Get the given list variable.
+             * 
+             * @instance
+             * @method getListVariable
+             * @param {string} name the name of the list variable
+             * @return The list variable.
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.getListVariable = function(name) {
+                if (!_listVariables.hasOwnProperty(name)) {
+                    throw "Sprite does not have a list variable called '" + name + "'";
+                }
+                return _listVariables[name];
+            };
+
+            /**
              * Returns the names of all the variables for this sprite.
              * 
              * @instance
@@ -1246,6 +1805,19 @@ PodJS.ScratchPod = function(options) {
             };
 
             /**
+             * Returns true if the list variable exists for this sprite, or false if not.
+             * 
+             * @instance
+             * @method hasListVariable
+             * @param {string} name the name of the list variable
+             * @return {boolean} true if the list variable exists or false if not.
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.hasListVariable = function(name) {
+                return _listVariables.hasOwnProperty(name);
+            };
+
+            /**
              * Sets whether this variable is shown on the stage, and the location at which it is shown.
              * 
              * @instance
@@ -1270,6 +1842,41 @@ PodJS.ScratchPod = function(options) {
                     throw "Sprite does not have a variable called '" + name + "'";
                 }
                 _variables[name].shown = shown;
+            };
+
+            /**
+             * Sets whether this list variable is shown on the stage, and the location at which it is shown.
+             * 
+             * @instance
+             * @method showListVariable
+             * @param {string} name the name of the list variable
+             * @param {boolean} shown true if the list variable is to be shown, or false if not. Optional, defaults to true.
+             * @param {number} x x position of the list variable on the stage (optional, defaults to 0)
+             * @param {number} y y position of the list variable on the stage (optional, defaults to 0)
+             * @param {number} width width Width of the box to show (optional, defaults to enough width to show small ints)
+             * @param {number} height height of the box to show (optional, defaults to 8 rows worth of pixels)
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.showListVariable = function(name, shown, x, y, width, height) {
+                if (typeof(shown) === "undefined") {
+                    shown = true;
+                }
+                if (typeof(x) !== "undefined") {
+                    _listVariables[name].x = x;
+                }
+                if (typeof(y) !== "undefined") {
+                    _listVariables[name].y = y;
+                }
+                if (typeof(width) !== "undefined") {
+                    _listVariables[name].width = width;
+                }
+                if (typeof(height) !== "undefined") {
+                    _listVariables[name].height = height;
+                }
+                if (!_listVariables.hasOwnProperty(name)) {
+                    throw "Sprite does not have a list variable called '" + name + "'";
+                }
+                _listVariables[name].shown = shown;
             };
 
             /**
@@ -1573,6 +2180,76 @@ PodJS.ScratchPod = function(options) {
      * @memberOf PodJS.ScratchPod
      */
     var attachToDiv = function() {
+        var style = document.createElement("style");
+        style.innerText = "\n\
+.podjs_scratch_list_var { \n\
+    z-index: 100; \n\
+    padding: 2px 6px; \n\
+    border: 1px solid #949191; \n\
+    background: #c1c4c7; \n\
+    font-weight: bold; \n\
+    font-family: sans-serif; \n\
+    border-radius: 4px; \n\
+    font-size: 10pt; \n\
+    visibility: hidden; \n\
+    height: 185px;\n\
+} \n\
+.podjs_scratch_list_value_div {\n\
+    height: calc(100% - 45px); \n\
+    overflow-y: auto; \n\
+    padding-right: 16px; \n\
+    margin-top: 10px;\n\
+    min-width: 100px;\n\
+}\n\
+.podjs_scratch_list_var_list { \n\
+    padding-left: 0px;\n\
+    margin: 0px; \n\
+    list-style-type: decimal; \n\
+} \n\
+.podjs_scratch_list_var_item { \n\
+    margin-left: 30px; \n\
+    color: #000000; \n\
+    padding: 0px 4px; \n\
+} \n\
+.podjs_scratch_list_var_item_span { \n\
+    background: #ee7d16; \n\
+    color: #ffffff; \n\
+    min-width: 34px; \n\
+    padding: 0px 4px; \n\
+    border: 1px solid #ffffff; \n\
+    border-radius: 4px; \n\
+    text-align: left; \n\
+    display: block; \n\
+} \n\
+.podjs_scratch_list_var_length_div { \n\
+    font-weight: normal;\n\
+    margin-top: 5px;\n\
+} \n\
+.podjs_scratch_var_div { \n\
+    z-index: 100; \n\
+    padding: 2px 6px; \n\
+    border: 1px solid #949191; \n\
+    background: #c1c4c7; \n\
+    font-weight: bold; \n\
+    font-family: sans-serif; \n\
+    border-radius: 4px; \n\
+    font-size: 10pt; \n\
+    visibility: hidden; \n\
+} \n\
+.podjs_scratch_var_value { \n\
+    margin-left: 6px; \n\
+    background: #ee7d16; \n\
+    color: #ffffff; \n\
+    min-width: 34px; \n\
+    padding: 0px 4px; \n\
+    border: 1px solid #ffffff; \n\
+    border-radius: 4px; \n\
+    float: right; \n\
+    text-align: center; \n\
+} \n\
+";
+        document.head.appendChild(style);
+        
         var divId = options.scratch_stage_div;
         if (typeof(divId) === "undefined") {
             divId = "stage";
