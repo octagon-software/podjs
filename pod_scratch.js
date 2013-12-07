@@ -1656,6 +1656,33 @@ PodJS.ScratchPod = function(options) {
                     context.blockScript.nextBlock();
                     console.log("show_variable " + variable);
                 }
+            },
+            {
+                blockType : "variable",
+                description : "Returns the value of the variable with the provided name.",
+                parameterInfo : [
+                    { name : "variable" }
+                ],
+                returnsValue : true,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite" || resource.resourceType === "stage";
+                },
+                tick : function(context) {
+                    var result;
+                    var resource = context.resource;
+                    var variable = context.blockScript.nextArgument();
+                    
+                    if (resource.resourceType === "sprite" && resource.hasVariable(variable)) {
+                        var sprite = resource;
+                        result = sprite.getVariable(variable);
+                    } else if (ScratchPod_this.hasVariable(variable)) {
+                        result = ScratchPod_this.getVariable(variable);
+                    } else {
+                        throw new Error("Variable '" + variable + "' is not defined.");
+                    }
+                    console.log("variable " + variable + " == " + result);
+                    return result;
+                }
             }
             
         ];
