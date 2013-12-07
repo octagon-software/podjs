@@ -1032,6 +1032,20 @@ PodJS.ScratchPod = function(options) {
                     context.blockScript.nextBlock();
                 }
             },
+            {
+                blockType : "stop_all_sounds",
+                description : "The block will stop any sounds currently being played on all sprites and the Stage.",
+                parameterInfo : [],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite" || resource.resourceType === "stage";
+                },
+                tick : function(context) {
+                    console.log("stop_all_sounds");
+                    ScratchPod_this.stopAllSounds();
+                    context.blockScript.nextBlock();
+                }
+            },
             
             //////////////////////////////////////////////////////////////
             // EventBlocks
@@ -1967,18 +1981,22 @@ PodJS.ScratchPod = function(options) {
         
         this.playSound = function(name) {
             var audioId = prefix + "::" + name;
-            if (_currentSound !== null) {
-                _currentSound.stop();
-                _currentSound.removeAllEventListeners();
-            }
+            this.stopAllSounds();
             if (_audioFiles.hasOwnProperty(audioId) && _audioFiles[audioId].loaded) {
                 this.soundComplete = false;
                 _currentSound = createjs.Sound.play(audioId);
                 _currentSound.addEventListener("complete", createjs.proxy(_handleComplete, AudioFeature_this));
             } else {
                 console.log("Warning: Sound '" + audioId + "' not loaded yet, so not playing.");
-                this.soundComplete = true;
+            }
+        };
+
+        this.stopAllSounds = function() {
+            if (_currentSound !== null) {
+                _currentSound.stop();
+                _currentSound.removeAllEventListeners();
                 _currentSound = null;
+                this.soundComplete = true;
             }
         };
     };
@@ -2273,6 +2291,17 @@ PodJS.ScratchPod = function(options) {
             this.playSound = function(name) {
                 _audio.playSound(name);
             };
+            
+            /**
+             * Stop playing any sounds for this sprite.
+             * 
+             * @instance
+             * @method stopAllSounds
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.stopAllSounds = function() {
+                _audio.stopAllSounds();
+            };
 
             /**
              * Change costume for this Sprite
@@ -2498,6 +2527,17 @@ PodJS.ScratchPod = function(options) {
             this.playSound = function(name) {
                 _audio.playSound(name);
             };
+            
+            /**
+             * Stop playing any sounds for the stage.
+             * 
+             * @instance
+             * @method stopAllSounds
+             * @memberof PodJS.ScratchPod.Stage
+             */
+            this.stopAllSounds = function() {
+                _audio.stopAllSounds();
+            };
         };
         Stage.prototype = parentObject;
         var result = new Stage();
@@ -2592,6 +2632,30 @@ PodJS.ScratchPod = function(options) {
      */
     this.getStage = function() {
         return _stage;
+    };
+    
+    /**
+     * Stop playing all sounds being played by scratch resources.
+     * 
+     * @method stopAllSounds
+     * @memberof PodJS.ScratchPod
+     * @instance
+     */
+    this.stopAllSounds = function() {
+        var resources = ScratchPod_this.getAllResources()
+        for (var resType in resources) {
+            if (resources.hasOwnProperty(resType)) {
+                var resourceByType = resources[resType];
+                for (var resName in resourceByType) {
+                    if (resourceByType.hasOwnProperty(resName)) {
+                        var resource = resourceByType[resName];
+                        if (resource.hasOwnProperty("stopAllSounds")) {
+                            resource.stopAllSounds();
+                        }
+                    }
+                }
+            }
+        }
     };
 
     /**
