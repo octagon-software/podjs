@@ -765,18 +765,16 @@ PodJS.ScratchPod = function(options) {
         if (typeof(shown) === "undefined") {
             shown = true;
         }
-        if (typeof(x) === "undefined") {
-            x = 0;
+        if (typeof(x) !== "undefined") {
+            _variables[name].x = x;
         }
-        if (typeof(y) === "undefined") {
-            y = 0;
+        if (typeof(y) !== "undefined") {
+            _variables[name].y = y;
         }
         if (!_variables.hasOwnProperty(name)) {
             throw "All Sprites does not have a variable called '" + name + "'";
         }
         _variables[name].shown = shown;
-        _variables[name].x = x;
-        _variables[name].y = y;
     };
 
     /**
@@ -1181,6 +1179,44 @@ PodJS.ScratchPod = function(options) {
                         delete context.block.evaluated;
                         delete context.block.nextIP;
                     }
+                }
+            },
+            {
+                blockType : "repeat",
+                description : "Blocks held inside this block will loop a given amount of times, before allowing the " +
+                    "script to continue.",
+                parameterInfo : [
+                    { name : "count" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                reset : function(context) {
+                    delete context.block.remaining;
+                    delete context.block.nextIP;
+                },
+                tick : function(context) {
+                    var ipOfRepeat = context.blockScript.index;
+                    if (typeof(context.block.remaining) === "undefined") {
+                        context.block.remaining = Math.ceil(Number(context.blockScript.nextArgument()));
+                        context.blockScript.nextBlock();
+                        context.block.nextIP = context.blockScript.index;
+                    } else {
+                        context.blockScript.index = context.block.nextIP;
+                    }
+                    if (context.block.remaining > 0) {
+                        console.log("repeat " + context.block.remaining);
+                        context.block.remaining--;
+                        var beginIP = context.blockScript.index;
+                        context.blockScript.index = ipOfRepeat;
+                        context.blockScript.pushIP();
+                        context.blockScript.index = beginIP;
+                    } else {
+                        context.blockScript.skipBeginEndBlock();
+                        this.reset(context);
+                    }
+                    context.blockScript.yield = true;
                 }
             },
             {
@@ -2309,6 +2345,18 @@ PodJS.ScratchPod = function(options) {
         var blockClass = this.newBlockClass(blockType, resource, script);
         var block = Object.create(blockClass);
         return block;
+    };
+    
+    /**
+     * Returns the stage.
+     * 
+     * @method getStage
+     * @memberof PodJS.ScratchPod
+     * @instance
+     * @returns {PodJS.ScratchPod.Stage} The stage
+     */
+    this.getStage = function() {
+        return _stage;
     };
 
     /**
