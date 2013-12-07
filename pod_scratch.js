@@ -174,6 +174,15 @@ PodJS.ScratchPod = function(options) {
      * @memberof PodJS.ScratchPod
      */
     var _listVariables = {};
+    
+    /**
+     * Last (x, y) coordinate of the mouse, in global coordinates.
+     * 
+     * @private
+     * @instance
+     * @memberof PodJS.ScratchPod
+     */
+    var _lastMousePoint = { x: 0, y : 0 };
 
     /**
      * Sanitize HTML
@@ -1308,6 +1317,65 @@ PodJS.ScratchPod = function(options) {
             },
 
             //////////////////////////////////////////////////////////////
+            // Sensing Blocks
+            {
+                blockType : "touching",
+                description : "The block checks if its sprite is touching the mouse-pointer (use the string 'mouse_pointer'), " +
+                    "edge (use the string 'edge'), or another sprite (a Reporter block holding the sprite's name can be " +
+                    "used). If the sprite is touching the selected object, the block returns true; if it is not, it " +
+                    "returns false.",
+                parameterInfo : [
+                    { name : "object" }
+                ],
+                returnsValue : true,
+                compatibleWith : function(resource) {
+                    return true;
+                },
+                tick : function(context) {
+                    var result = false;
+                    var obj = context.blockScript.nextArgument();
+                    
+                    var sprite = context.resource;
+                    var bitmap = null;
+                    var costume = sprite._getCurrentCostumeObject();
+                    if (costume !== null) {
+                        bitmap = costume.getEaselBitmap();
+                    }
+
+                    if (obj === "mouse-pointer") {
+                        // This should return true even if the object is hidden
+                        if (bitmap !== null) {
+                            var spritePoint = bitmap.globalToLocal(_lastMousePoint.x, _lastMousePoint.y);
+                            result = bitmap.hitTest(spritePoint.x, spritePoint.y);
+                        }
+                    } else if (obj === "edge") {
+                        // This should return true even if the object is hidden
+                        // TODO: Implement this
+                    } else {
+                        // assume a sprite name.
+                        var otherSprite = ScratchPod_this.getResourceByName(obj);
+                        if (otherSprite === null) {
+                            console.log("No sprite found by the name of '" + obj + "'.");
+                            result = false;
+                        } else {
+                            var otherBitmap = null;
+                            var otherCostume = otherSprite._getCurrentCostumeObject();
+                            if (otherCostume !== null) {
+                                otherBitmap = otherCostume.getEaselBitmap();
+                            }
+                            
+                            if (bitmap !== null && otherBitmap !== null) {
+                                result = ndgmr.checkPixelCollision(bitmap, otherBitmap) ? true : false;
+                            }
+                        }
+                        // Should not return true if either sprite is hidden
+                    }
+                    console.log("touching " + obj + " == " + result);
+                    return result;
+                }
+            },
+
+            //////////////////////////////////////////////////////////////
             // Operators Blocks
             {
                 blockType : "equals",
@@ -2117,6 +2185,20 @@ PodJS.ScratchPod = function(options) {
             };
 
             /**
+             * Return the currently active costume object for this Sprite
+             * <p>
+             * This method is intended for internal use and may change in the future.
+             *
+             * @instance
+             * @method _getCurrentCostumeObject
+             * @return {PodJS.ScratchPod.Costume}
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this._getCurrentCostumeObject = function() {
+                return _costumes[_currentCostume];
+            };
+
+            /**
              * Changes whether this sprite is being shown or not.
              * 
              * @instance
@@ -2514,6 +2596,16 @@ PodJS.ScratchPod = function(options) {
         // Attach createjs to canvas
         _easelStage = new createjs.Stage(_canvas);
         _easelStage.setTransform(_canvas.width / 2, _canvas.height / 2);
+        var prevOnMouseMove = _canvas.onmousemove;
+        _canvas.onmousemove = function(e) {
+            var x = e.pageX - _canvas.offsetLeft;
+            var y = e.pageY - _canvas.offsetTop;
+            _lastMousePoint.x = x;
+            _lastMousePoint.y = y;
+            if (prevOnMouseMove) {
+                prevOnMouseMove(e);
+            }
+        };
     };
 
     /**
