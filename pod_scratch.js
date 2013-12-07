@@ -185,6 +185,29 @@ PodJS.ScratchPod = function(options) {
     var _lastMousePoint = { x: 0, y : 0 };
 
     /**
+     * Information about each audio resource. Key is spriteName::audioName or just ::audioName for the stage.
+     * Value is an AudioInfo object.
+     */
+    var _audioFiles = {};
+
+    /**
+     * @private
+     * @instance
+     * @memberof PodJS.ScratchPod
+     * 
+     * @property {string} prefix prefix of the audio id, either the sprite name or "" if the stage.
+     * @property {string} name the name of the audio file, from the resource's perspective
+     * @property {string} href of the source of the audio
+     * @property {boolean} loaded true if loaded, false if still loading.
+     */
+    var AudioInfo = {
+        prefix : "",
+        name : "",
+        src : "",
+        loaded : false
+    };
+
+    /**
      * Sanitize HTML
      * Source: http://stackoverflow.com/questions/295566/sanitize-rewrite-html-on-the-client-side
      */
@@ -990,6 +1013,26 @@ PodJS.ScratchPod = function(options) {
                 }
             },
 
+            //////////////////////////////////////////////////////////////
+            // Sound Blocks
+            {
+                blockType : "play_sound",
+                description : "The block will play the specified sound, with no pause to its script",
+                parameterInfo : [
+                    { name : "audioId" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite" || resource.resourceType === "stage";
+                },
+                tick : function(context) {
+                    var audioId = context.blockScript.nextArgument();
+                    console.log("play_sound " + audioId);
+                    context.resource.playSound(audioId);
+                    context.blockScript.nextBlock();
+                }
+            },
+            
             //////////////////////////////////////////////////////////////
             // EventBlocks
             {
@@ -1883,6 +1926,64 @@ PodJS.ScratchPod = function(options) {
     };
 
     /**
+     * @private
+     * @instance
+     * @class AudioFeature
+     * @classdesc Equips a resource with the capability to play audio. Each AudioFeature can only play one sound at a time and
+     *     handles loading, playing and stopping of the audio.
+     *     
+     * @param {string} prefix The prefix to use to keep audio resources unique.
+     */
+    var AudioFeature = function(prefix) {
+        var AudioFeature_this = this;
+
+        // Sound currently being played
+        var _currentSound = null;
+        
+        /**
+         * True if the sound for this sprite / stage is done playing, or false if actively playing.
+         *
+         * @member
+         * @memberof PodJS.ScratchPod.AudioFeature
+         */
+        this.soundComplete = true;
+        
+        this.loadAudio = function(name, src) {
+            var audioId = prefix + "::" + name;
+            if (_audioFiles.hasOwnProperty(audioId)) {
+                throw new Error("Already have an audio resource called '" + name + "'");
+            }
+            var audioInfo = Object.create(AudioInfo);
+            audioInfo.prefix = prefix;
+            audioInfo.name = name;
+            audioInfo.src = src;
+            _audioFiles[audioId] = audioInfo;
+            createjs.Sound.registerSound(src, audioId);
+        };
+        
+        var _handleComplete = function(event) {
+            this.soundComplete = true;
+        };
+        
+        this.playSound = function(name) {
+            var audioId = prefix + "::" + name;
+            if (_currentSound !== null) {
+                _currentSound.stop();
+                _currentSound.removeAllEventListeners();
+            }
+            if (_audioFiles.hasOwnProperty(audioId) && _audioFiles[audioId].loaded) {
+                this.soundComplete = false;
+                _currentSound = createjs.Sound.play(audioId);
+                _currentSound.addEventListener("complete", createjs.proxy(_handleComplete, AudioFeature_this));
+            } else {
+                console.log("Warning: Sound '" + audioId + "' not loaded yet, so not playing.");
+                this.soundComplete = true;
+                _currentSound = null;
+            }
+        };
+    };
+
+    /**
      * Internal factory method for new Sprite class instances.
      *
      * @private
@@ -1925,6 +2026,7 @@ PodJS.ScratchPod = function(options) {
             var _show = true;
             var _x = 0;
             var _y = 0;
+            var _audio = new AudioFeature(spriteName);
             
             /**
              * The last time this Sprite was clicked, or 0 if never clicked, in millis since epoch.
@@ -2148,6 +2250,31 @@ PodJS.ScratchPod = function(options) {
             };
 
             /**
+             * Load and register an audio file for this sprite.
+             * 
+             * @instance
+             * @method loadAudio
+             * @param {string} name the name of the audio
+             * @param {string} src the href of where to find the audio file.
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.loadAudio = function(name, src) {
+                _audio.loadAudio(name, src);
+            };
+            
+            /**
+             * Stop playing any sounds and play a new sound.
+             * 
+             * @instance
+             * @method playSound
+             * @param {string} name the id of the sound to play
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.playSound = function(name) {
+                _audio.playSound(name);
+            };
+
+            /**
              * Change costume for this Sprite
              * 
              * @instance
@@ -2314,6 +2441,7 @@ PodJS.ScratchPod = function(options) {
         // Private Stage class
         var Stage = function() {
             var _currentBackdrop = null;
+            var _audio = new AudioFeature("");
 
             var _backdrops = {};
 
@@ -2344,6 +2472,31 @@ PodJS.ScratchPod = function(options) {
                 _easelStage.update();
 
                 _currentBackdrop = newBackdrop;
+            };
+
+            /**
+             * Load and register an audio file for the stage.
+             * 
+             * @instance
+             * @method loadAudio
+             * @param {string} name the name of the audio
+             * @param {string} src the href of where to find the audio file.
+             * @memberof PodJS.ScratchPod.Stage
+             */
+            this.loadAudio = function(name, src) {
+                _audio.loadAudio(name, src);
+            };
+            
+            /**
+             * Stop playing any sounds for the stage and play a new sound.
+             * 
+             * @instance
+             * @method playSound
+             * @param {string} name the id of the sound to play
+             * @memberof PodJS.ScratchPod.Stage
+             */
+            this.playSound = function(name) {
+                _audio.playSound(name);
             };
         };
         Stage.prototype = parentObject;
@@ -2657,6 +2810,18 @@ PodJS.ScratchPod = function(options) {
         }
     };
 
+    var _audioLoadHandler = function(event) {
+        var audioId = event.id;
+        if (_audioFiles.hasOwnProperty(audioId)) {
+            var info = _audioFiles[audioId];
+            info.loaded = true;
+        }
+    };
+
+    var _initializeAudio = function() {
+         createjs.Sound.addEventListener("fileload", createjs.proxy(_audioLoadHandler, ScratchPod_this));
+    };
+
     var construct = function() {
         // Ensure createjs is loaded:
         if (typeof(createjs) === "undefined") {
@@ -2669,6 +2834,8 @@ PodJS.ScratchPod = function(options) {
         
         // Initialize stage and add a default backdrop
         _stage = ScratchPod_this.newResource("stage", "stage");
+        
+        _initializeAudio();
     };
     construct();
 };
