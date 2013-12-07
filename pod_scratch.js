@@ -1578,6 +1578,48 @@ PodJS.ScratchPod = function(options) {
                 }
             },
             {
+                blockType : "item_of",
+                description : "Reports the contents of the specified item on a list. Pass a 1-based number or the string " +
+                    "'last' to get the value of the last item or 'random' to get the value of a random item.",
+                parameterInfo : [
+                    { name : "what" },
+                    { name : "listVariable" }
+                ],
+                returnsValue : true,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite" || resource.resourceType === "stage";
+                },
+                tick : function(context) {
+                    var resource = context.resource;
+                    var what = context.blockScript.nextArgument();
+                    var listVariable = context.blockScript.nextArgument();
+                    
+                    var list;
+                    if (resource.resourceType === "sprite" && resource.hasListVariable(listVariable)) {
+                        var sprite = resource;
+                        list = sprite.getListVariable(listVariable);
+                    } else if (ScratchPod_this.hasListVariable(listVariable)) {
+                        list = ScratchPod_this.getListVariable(listVariable);
+                    } else {
+                        throw new Error("List variable '" + listVariable + "' is not defined.");
+                    }
+                    
+                    var result;
+                    if (what === "last") {
+                        result = list.getAt(list.length() - 1);
+                    } else if (what === "random") {
+                        var index = Math.floor(Math.random() * list.length());
+                        result = list.getAt(index);
+                    } else {
+                        var index = Number(what) - 1;
+                        result = list.getAt(index);
+                    }
+                    
+                    console.log("item_of " + what + " " + listVariable + " == " + result);
+                    return result;
+                }
+            },
+            {
                 blockType : "length_of",
                 description : "Reports how many items a list contains",
                 parameterInfo : [
