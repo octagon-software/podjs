@@ -796,10 +796,10 @@ PodJS.ScratchPod = function(options) {
         if (typeof(shown) === "undefined") {
             shown = true;
         }
-        if (typeof(x) !== "undefined") {
+        if (typeof(x) !== "undefined" && x !== null) {
             _listVariables[name].x = x;
         }
-        if (typeof(y) !== "undefined") {
+        if (typeof(y) !== "undefined" && y !== null) {
             _listVariables[name].y = y;
         }
         if (typeof(width) !== "undefined") {
@@ -2001,10 +2001,10 @@ PodJS.ScratchPod = function(options) {
                 if (typeof(shown) === "undefined") {
                     shown = true;
                 }
-                if (typeof(x) !== "undefined") {
+                if (typeof(x) !== "undefined" && x !== null) {
                     _listVariables[name].x = x;
                 }
-                if (typeof(y) !== "undefined") {
+                if (typeof(y) !== "undefined" && y !== null) {
                     _listVariables[name].y = y;
                 }
                 if (typeof(width) !== "undefined") {
