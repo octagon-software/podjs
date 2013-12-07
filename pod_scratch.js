@@ -1578,6 +1578,33 @@ PodJS.ScratchPod = function(options) {
                 }
             },
             {
+                blockType : "length_of",
+                description : "Reports how many items a list contains",
+                parameterInfo : [
+                    { name : "listVariable" }
+                ],
+                returnsValue : true,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite" || resource.resourceType === "stage";
+                },
+                tick : function(context) {
+                    var resource = context.resource;
+                    var listVariable = context.blockScript.nextArgument();
+                    
+                    var result;
+                    if (resource.resourceType === "sprite" && resource.hasListVariable(listVariable)) {
+                        var sprite = resource;
+                        result = sprite.getListVariable(listVariable).length();
+                    } else if (ScratchPod_this.hasListVariable(listVariable)) {
+                        result = ScratchPod_this.getListVariable(listVariable).length();
+                    } else {
+                        throw new Error("List variable '" + listVariable + "' is not defined.");
+                    }
+                    console.log("length_of " + listVariable + " == " + result);
+                    return result;
+                }
+            },
+            {
                 blockType : "set_to",
                 description : "The block will set the specified variable to the given value: a string or number",
                 parameterInfo : [
