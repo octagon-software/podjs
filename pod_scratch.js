@@ -2015,8 +2015,8 @@ PodJS.ScratchPod = function(options) {
             var construct = function() {
                 var img = new Image();
                 img.onload = function() {
-                    _easelBitmap.x = -img.width / 2;
-                    _easelBitmap.y = -img.height / 2;
+                    _easelBitmap.x = -img.width * _easelBitmap.scaleX / 2;
+                    _easelBitmap.y = -img.height * _easelBitmap.scaleY / 2;
                 };
                 img.src = src;
                 _easelBitmap = new createjs.Bitmap(img);
@@ -2394,7 +2394,7 @@ PodJS.ScratchPod = function(options) {
                     var bitmap = costume.getEaselBitmap();
                     bitmap.show = _show;
                     bitmap.x = -bitmap.image.width * bitmap.scaleX / 2 + _x;
-                    bitmap.y = -bitmap.image.height * bitmap.scaleY / 2 + _y;
+                    bitmap.y = -bitmap.image.height * bitmap.scaleY / 2 - _y;
                 }
             };
 
