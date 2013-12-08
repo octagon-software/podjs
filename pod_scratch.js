@@ -925,6 +925,44 @@ PodJS.ScratchPod = function(options) {
             //////////////////////////////////////////////////////////////
             // Motion Blocks
             {
+                blockType : "change_x",
+                description : "The block moves its sprite costume center's X position by the specified amount.",
+                parameterInfo : [
+                    { name : "steps" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite";
+                },
+                tick : function(context) {
+                    var arg = context.blockScript.nextArgument();
+                    console.log("change_x " + arg);
+                    var sprite = context.resource;
+                    sprite.translate(arg, 0);
+                    context.blockScript.nextBlock();
+                    context.blockScript.yield = true;
+                }
+            },
+            {
+                blockType : "change_y",
+                description : "The block moves its sprite costume center's Y position by the specified amount.",
+                parameterInfo : [
+                    { name : "steps" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite";
+                },
+                tick : function(context) {
+                    var arg = context.blockScript.nextArgument();
+                    console.log("change_y " + arg);
+                    var sprite = context.resource;
+                    sprite.translate(0, arg);
+                    context.blockScript.nextBlock();
+                    context.blockScript.yield = true;
+                }
+            },
+            {
                 blockType : "move",
                 description : "Moves its sprite forward the specified amount of steps in the direction it is facing, a " +
                     "step being 1 pixel length.",
@@ -940,6 +978,25 @@ PodJS.ScratchPod = function(options) {
                     console.log("move " + arg);
                     var sprite = context.resource;
                     sprite.moveSteps(arg);
+                    context.blockScript.nextBlock();
+                    context.blockScript.yield = true;
+                }
+            },
+            {
+                blockType : "point_dir",
+                description : "The block points its sprite in the specified direction; this rotates the sprite.",
+                parameterInfo : [
+                    { name : "degrees" }
+                ],
+                returnsValue : false,
+                compatibleWith : function(resource) {
+                    return resource.resourceType === "sprite";
+                },
+                tick : function(context) {
+                    var arg = context.blockScript.nextArgument();
+                    console.log("point_dir " + arg);
+                    var sprite = context.resource;
+                    sprite.setDirection(arg);
                     context.blockScript.nextBlock();
                     context.blockScript.yield = true;
                 }
@@ -1229,7 +1286,7 @@ PodJS.ScratchPod = function(options) {
                         } else {
                             context.blockScript.skipBeginEndBlock();
                             var b = context.blockScript.peekBlock();
-                            if (b.blockType === "otherwise") {
+                            if (b != null && b.blockType === "otherwise") {
                                 // execute the otherwise block
                                 context.blockScript.nextBlock();
                                 var beginIP = context.blockScript.index;
@@ -2056,7 +2113,16 @@ PodJS.ScratchPod = function(options) {
             var _show = true;
             var _x = 0;
             var _y = 0;
+            var _direction = 90;
             var _audio = new AudioFeature(spriteName);
+            
+            /**
+             * Converts direction (which is in Scratch format, 0 = up, -90 = left, 90 = right, 180 = down) to normalized
+             * degrees (0 = right, 90 = up, 180 = left, 270 = down).
+             */
+            var _normalizedDirection = function() {
+                return ((-_direction) + 90 + 360) % 360;
+            };
             
             /**
              * The last time this Sprite was clicked, or 0 if never clicked, in millis since epoch.
@@ -2443,8 +2509,11 @@ PodJS.ScratchPod = function(options) {
                     var costume = _costumes[_currentCostume];
                     var bitmap = costume.getEaselBitmap();
                     bitmap.show = _show;
-                    bitmap.x = -bitmap.image.width * bitmap.scaleX / 2 + _x;
-                    bitmap.y = -bitmap.image.height * bitmap.scaleY / 2 - _y;
+                    bitmap.regX = bitmap.image.width / 2;
+                    bitmap.regY = bitmap.image.height / 2;
+                    bitmap.x = _x;
+                    bitmap.y = -_y;
+                    bitmap.rotation = _normalizedDirection();
                 }
             };
 
@@ -2457,8 +2526,50 @@ PodJS.ScratchPod = function(options) {
              * @instance
              */
             this.moveSteps = function(steps) {
-                //TODO: Move based on direction, not always to the right
-                _x += steps;
+                var rad = _normalizedDirection() * Math.PI / 180;
+                var dx = Math.cos(rad);
+                var dy = Math.sin(rad);
+                _x += dx * steps;
+                _y -= dy * steps;
+                return this;
+            };
+
+            /**
+             * Move this sprite the given number of steps in the X and Y directions.
+             *
+             * @method translate
+             * @param {number} x The number of steps to move the Sprite, in the x direction.
+             * @param {number} y The number of steps to move the Sprite, in the y direction.
+             * @memberof PodJS.ScratchPod.Sprite
+             * @instance
+             */
+            this.translate = function(x, y) {
+                _x += x;
+                _y += y;
+                return this;
+            };
+
+            /**
+             * Returns the current direction of the sprite, in degrees normalized to 0 (inclusive) to 360 (exclusive).
+             *
+             * @method getDirection
+             * @memberof PodJS.ScratchPod.Sprite
+             * @instance
+             */
+            this.getDirection = function() {
+                return _direction;
+            };
+
+            /**
+             * Point this sprite in the direction given
+             *
+             * @method setDirection
+             * @param {number} degrees The number of steps to move the Sprite, in the x direction.
+             * @memberof PodJS.ScratchPod.Sprite
+             * @instance
+             */
+            this.setDirection = function(degrees) {
+                _direction = degrees;
                 return this;
             };
 
