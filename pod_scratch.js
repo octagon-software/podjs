@@ -1970,10 +1970,10 @@ PodJS.ScratchPod = function(options) {
          */
         this.soundComplete = true;
         
-        this.loadAudio = function(name, src) {
+        this.loadSound = function(name, src) {
             var audioId = prefix + "::" + name;
             if (_audioFiles.hasOwnProperty(audioId)) {
-                throw new Error("Already have an audio resource called '" + name + "'");
+                throw new Error("Already have a sound resource called '" + name + "'");
             }
             var audioInfo = Object.create(AudioInfo);
             audioInfo.prefix = prefix;
@@ -2291,13 +2291,13 @@ PodJS.ScratchPod = function(options) {
              * Load and register an audio file for this sprite.
              * 
              * @instance
-             * @method loadAudio
+             * @method loadSound
              * @param {string} name the name of the audio
              * @param {string} src the href of where to find the audio file.
              * @memberof PodJS.ScratchPod.Sprite
              */
-            this.loadAudio = function(name, src) {
-                _audio.loadAudio(name, src);
+            this.loadSound = function(name, src) {
+                _audio.loadSound(name, src);
                 return this;
             };
             
@@ -2394,6 +2394,28 @@ PodJS.ScratchPod = function(options) {
                     easelBitmap.visible = show;
                 }
                 return this;
+            };
+
+            /**
+             * Shortcut for setShown(false)
+             * 
+             * @instance
+             * @method hide
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.hide = function() {
+                return this.setShown(false);
+            };
+
+            /**
+             * Shortcut for setShown(true)
+             * 
+             * @instance
+             * @method show
+             * @memberof PodJS.ScratchPod.Sprite
+             */
+            this.show = function() {
+                return this.setShown(true);
             };
 
             /**
@@ -2535,13 +2557,13 @@ PodJS.ScratchPod = function(options) {
              * Load and register an audio file for the stage.
              * 
              * @instance
-             * @method loadAudio
+             * @method loadSound
              * @param {string} name the name of the audio
              * @param {string} src the href of where to find the audio file.
              * @memberof PodJS.ScratchPod.Stage
              */
-            this.loadAudio = function(name, src) {
-                _audio.loadAudio(name, src);
+            this.loadSound = function(name, src) {
+                _audio.loadSound(name, src);
                 return this;
             };
             
@@ -2805,6 +2827,7 @@ PodJS.ScratchPod = function(options) {
             _env.resetAllScripts();
             _redStopButton.onmouseout();
             _greenFlagButton.onmouseout();
+            ScratchPod_this.stopAllSounds();
         };
         _redStopButton.onmouseout();
         _controlsDiv.appendChild(_redStopButton);
