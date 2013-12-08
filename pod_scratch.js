@@ -2013,7 +2013,8 @@ PodJS.ScratchPod = function(options) {
      */
     var createSprite = function(parentObject, spriteName) {
         // Private Costume class
-        var Costume = function(src) {
+        var Costume = function(src, scale) {
+            scale = scale || 1.0;
             var _easelBitmap;
 
             this.getEaselBitmap = function() {
@@ -2023,10 +2024,13 @@ PodJS.ScratchPod = function(options) {
             var construct = function() {
                 var img = new Image();
                 img.onload = function() {
-                    _easelBitmap.setTransform(-img.width / 2, -img.height / 2);
+                    _easelBitmap.x = -img.width / 2;
+                    _easelBitmap.y = -img.height / 2;
                 };
                 img.src = src;
                 _easelBitmap = new createjs.Bitmap(img);
+                _easelBitmap.scaleX = scale;
+                _easelBitmap.scaleY = scale;
             };
             construct();
         };
@@ -2250,13 +2254,15 @@ PodJS.ScratchPod = function(options) {
              * @method loadCostume
              * @param {string} name the name of the costume
              * @param {string} src the href of where to find the image of the costume.
+             * @param {number} scale (optional) - if specified, scale the image up or down by this amount, defaults to 1.0.
              * @memberof PodJS.ScratchPod.Sprite
              */
-            this.loadCostume = function(name, src) {
+            this.loadCostume = function(name, src, scale) {
+                scale = scale || 1.0;
                 if (_costumes.hasOwnProperty(name)) {
                     throw "Sprite already has a costume called '" + name + "'";
                 }
-                var costume = new Costume(src);
+                var costume = new Costume(src, scale);
                 var bitmap = costume.getEaselBitmap();
                 bitmap.addEventListener("click", function(event) {
                     Sprite_this.lastClickTime = Date.now();
@@ -2396,9 +2402,8 @@ PodJS.ScratchPod = function(options) {
                     var costume = _costumes[_currentCostume];
                     var bitmap = costume.getEaselBitmap();
                     bitmap.show = _show;
-                    bitmap.setTransform(
-                        -bitmap.image.width / 2 + _x,
-                        -bitmap.image.height / 2 + _y);
+                    bitmap.x = -bitmap.image.width * bitmap.scaleX / 2 + _x;
+                    bitmap.y = -bitmap.image.height * bitmap.scaleY / 2 + _y;
                 }
             };
 
