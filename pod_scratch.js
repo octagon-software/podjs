@@ -892,6 +892,23 @@ PodJS.ScratchPod = function(options) {
     this.hasListVariable = function(name) {
         return _listVariables.hasOwnProperty(name);
     };
+    
+    /**
+     * Returns the sprite with the given name
+     * 
+     * @instance
+     * @method sprite
+     * @param {string} name the name of the sprite
+     * @return {PodJS.ScratchPod.Sprite} the sprite
+     * @memberof PodJS.ScratchPod
+     */
+    this.sprite = function(name) {
+        var result = this.getResourceByName(name);
+        if (result === null || result.resourceType !== "sprite") {
+            throw new Error("No sprite with the name '" + name + "' found.");
+        }
+        return result;
+    }
 
     /**
      * Part of the Pod standard interface - return information about the blocks provided
@@ -2065,6 +2082,7 @@ PodJS.ScratchPod = function(options) {
                 var variable = new Variable(spriteName, name);
                 _autoPositionVariable(variable);
                 _variables[name] = variable;
+                return this;
             };
 
             /**
@@ -2082,6 +2100,7 @@ PodJS.ScratchPod = function(options) {
                 var listVariable = new ScratchPod_this.ListVariable(spriteName, name);
                 _autoPositionListVariable(listVariable);
                 _listVariables[name] = listVariable;
+                return this;
             };
 
             /**
@@ -2098,6 +2117,7 @@ PodJS.ScratchPod = function(options) {
                     throw "Sprite does not have a variable called '" + name + "'";
                 }
                 _variables[name].value = value;
+                return this;
             };
 
             /**
@@ -2201,6 +2221,7 @@ PodJS.ScratchPod = function(options) {
                     throw "Sprite does not have a variable called '" + name + "'";
                 }
                 _variables[name].shown = shown;
+                return this;
             };
 
             /**
@@ -2236,6 +2257,7 @@ PodJS.ScratchPod = function(options) {
                     throw "Sprite does not have a list variable called '" + name + "'";
                 }
                 _listVariables[name].shown = shown;
+                return this;
             };
 
             /**
@@ -2262,6 +2284,7 @@ PodJS.ScratchPod = function(options) {
                 if (_currentCostume === null) {
                     this.setCostume(name);
                 }
+                return this;
             };
 
             /**
@@ -2275,6 +2298,7 @@ PodJS.ScratchPod = function(options) {
              */
             this.loadAudio = function(name, src) {
                 _audio.loadAudio(name, src);
+                return this;
             };
             
             /**
@@ -2287,6 +2311,7 @@ PodJS.ScratchPod = function(options) {
              */
             this.playSound = function(name) {
                 _audio.playSound(name);
+                return this;
             };
             
             /**
@@ -2298,6 +2323,7 @@ PodJS.ScratchPod = function(options) {
              */
             this.stopAllSounds = function() {
                 _audio.stopAllSounds();
+                return this;
             };
 
             /**
@@ -2335,6 +2361,7 @@ PodJS.ScratchPod = function(options) {
                     }
                     _currentCostume = name;
                 }
+                return this;
             };
 
             /**
@@ -2366,6 +2393,7 @@ PodJS.ScratchPod = function(options) {
                     var easelBitmap = costume.getEaselBitmap();
                     easelBitmap.visible = show;
                 }
+                return this;
             };
 
             /**
@@ -2409,6 +2437,7 @@ PodJS.ScratchPod = function(options) {
             this.moveSteps = function(steps) {
                 //TODO: Move based on direction, not always to the right
                 _x += steps;
+                return this;
             };
 
             /**
@@ -2423,6 +2452,7 @@ PodJS.ScratchPod = function(options) {
             this.goXY = function(x, y) {
                 _x = x;
                 _y = y;
+                return this;
             };
         };
         Sprite.prototype = parentObject;
@@ -2475,6 +2505,7 @@ PodJS.ScratchPod = function(options) {
                     throw "Stage already has a backdrop called '" + name + "'";
                 }
                 _backdrops[name] = new Backdrop(src);
+                return this;
             };
 
             this.switchBackdrop = function(name) {
@@ -2497,6 +2528,7 @@ PodJS.ScratchPod = function(options) {
                 _easelStage.update();
 
                 _currentBackdrop = newBackdrop;
+                return this;
             };
 
             /**
@@ -2510,6 +2542,7 @@ PodJS.ScratchPod = function(options) {
              */
             this.loadAudio = function(name, src) {
                 _audio.loadAudio(name, src);
+                return this;
             };
             
             /**
@@ -2522,6 +2555,7 @@ PodJS.ScratchPod = function(options) {
              */
             this.playSound = function(name) {
                 _audio.playSound(name);
+                return this;
             };
             
             /**
@@ -2533,6 +2567,7 @@ PodJS.ScratchPod = function(options) {
              */
             this.stopAllSounds = function() {
                 _audio.stopAllSounds();
+                return this;
             };
         };
         Stage.prototype = parentObject;
