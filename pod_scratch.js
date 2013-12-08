@@ -176,15 +176,6 @@ PodJS.ScratchPod = function(options) {
     var _listVariables = {};
     
     /**
-     * Last (x, y) coordinate of the mouse, in global coordinates.
-     * 
-     * @private
-     * @instance
-     * @memberof PodJS.ScratchPod
-     */
-    var _lastMousePoint = { x: 0, y : 0 };
-
-    /**
      * Information about each audio resource. Key is spriteName::audioName or just ::audioName for the stage.
      * Value is an AudioInfo object.
      */
@@ -1402,7 +1393,7 @@ PodJS.ScratchPod = function(options) {
                     if (obj === "mouse-pointer") {
                         // This should return true even if the object is hidden
                         if (bitmap !== null) {
-                            var spritePoint = bitmap.globalToLocal(_lastMousePoint.x, _lastMousePoint.y);
+                            var spritePoint = bitmap.globalToLocal(_easelStage.mouseX, _easelStage.mouseY);
                             result = bitmap.hitTest(spritePoint.x, spritePoint.y);
                         }
                     } else if (obj === "edge") {
@@ -2818,16 +2809,6 @@ PodJS.ScratchPod = function(options) {
         // Attach createjs to canvas
         _easelStage = new createjs.Stage(_canvas);
         _easelStage.setTransform(_canvas.width / 2, _canvas.height / 2);
-        var prevOnMouseMove = _canvas.onmousemove;
-        _canvas.onmousemove = function(e) {
-            var x = e.pageX - _canvas.offsetLeft;
-            var y = e.pageY - _canvas.offsetTop;
-            _lastMousePoint.x = x;
-            _lastMousePoint.y = y;
-            if (prevOnMouseMove) {
-                prevOnMouseMove(e);
-            }
-        };
     };
 
     /**
