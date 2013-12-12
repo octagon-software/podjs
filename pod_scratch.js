@@ -2040,7 +2040,14 @@ PodJS.ScratchPod = function(options) {
             var audioInfo = Object.create(AudioInfo);
             audioInfo.prefix = prefix;
             audioInfo.name = name;
-            audioInfo.src = _resourcesPathPrefix + src;
+            var audioSrc = _resourcesPathPrefix + src;
+            // Add .ogg version of sound as well, for Firefox
+            var mp3Index = src.indexOf(".mp3");
+            if (mp3Index !== -1) {
+                audioSrc += "|" + _resourcesPathPrefix + src.substring(0, mp3Index) + ".ogg";
+            }
+            audioInfo.src = audioSrc;
+            console.log(audioSrc);
             _audioFiles[audioId] = audioInfo;
             createjs.Sound.registerSound(audioInfo.src, audioId);
         };
@@ -3059,7 +3066,13 @@ PodJS.ScratchPod = function(options) {
     };
 
     var _initializeAudio = function() {
-         createjs.Sound.addEventListener("fileload", createjs.proxy(_audioLoadHandler, ScratchPod_this));
+        // TODO: Initialize audio once the user touches, so this works on mobile devices.
+        // See http://www.createjs.com/tutorials/Mobile%20Safe%20Approach/
+        if (!createjs.Sound.initializeDefaultPlugins()) {
+            console.log("Could not initialize SoundJS. Audio may not work correctly.");
+        } else {
+            createjs.Sound.addEventListener("fileload", createjs.proxy(_audioLoadHandler, ScratchPod_this));
+        }
     };
 
     var construct = function() {
