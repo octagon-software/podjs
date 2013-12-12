@@ -180,6 +180,11 @@ PodJS.ScratchPod = function(options) {
      * Value is an AudioInfo object.
      */
     var _audioFiles = {};
+    
+    /**
+     * Path prefix to prepend to all resource paths.
+     */
+    var _resourcesPathPrefix = "";
 
     /**
      * @private
@@ -2035,9 +2040,9 @@ PodJS.ScratchPod = function(options) {
             var audioInfo = Object.create(AudioInfo);
             audioInfo.prefix = prefix;
             audioInfo.name = name;
-            audioInfo.src = src;
+            audioInfo.src = _resourcesPathPrefix + src;
             _audioFiles[audioId] = audioInfo;
-            createjs.Sound.registerSound(src, audioId);
+            createjs.Sound.registerSound(audioInfo.src, audioId);
         };
         
         var _handleComplete = function(event) {
@@ -2341,7 +2346,7 @@ PodJS.ScratchPod = function(options) {
                 if (_costumes.hasOwnProperty(name)) {
                     throw "Sprite already has a costume called '" + name + "'";
                 }
-                var costume = new Costume(src, scale);
+                var costume = new Costume(_resourcesPathPrefix + src, scale);
                 var bitmap = costume.getEaselBitmap();
                 bitmap.addEventListener("click", function(event) {
                     Sprite_this.lastClickTime = Date.now();
@@ -2637,7 +2642,7 @@ PodJS.ScratchPod = function(options) {
                 if (_backdrops.hasOwnProperty(name)) {
                     throw "Stage already has a backdrop called '" + name + "'";
                 }
-                _backdrops[name] = new Backdrop(src);
+                _backdrops[name] = new Backdrop(_resourcesPathPrefix + src);
                 return this;
             };
 
@@ -2820,6 +2825,22 @@ PodJS.ScratchPod = function(options) {
                 }
             }
         }
+    };
+    
+    /**
+     * Sets the directory that all resources are relative to.
+     * 
+     * @method resourcesPath
+     * @memberof PodJS.ScratchPod
+     * @param {string} path The path prefix for all resources loaded by this pod. If it does not end in '/', a '/' will be added.
+     * @instance
+     */
+    this.setResourcesPath = function(path) {
+        if (path.charAt(path.length - 1) !== '/') {
+            path += '/';
+        }
+        _resourcesPathPrefix = path;
+        return ScratchPod_this;
     };
 
     /**
