@@ -2860,7 +2860,7 @@ PodJS.ScratchPod = function(options) {
      */
     var attachToDiv = function() {
         var style = document.createElement("style");
-        style.innerText = "\n\
+        style.innerHTML = "\n\
 .podjs_scratch_list_var { \n\
     z-index: 100; \n\
     padding: 2px 6px; \n\
