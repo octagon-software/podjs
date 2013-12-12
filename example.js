@@ -26,17 +26,50 @@
 
 var env = new PodJS();
 var scratch = env.pod("scratch");
+
+var stage = scratch.getStage();
+stage.loadSound("chime", "audio/chime.mp3");
+
 var robot = scratch.newSprite("robot");
+robot.goXY(-50, 0);
 robot.loadCostume("costume1", "img/Cartoon_Robot_a.svg");
 robot.loadCostume("costume2", "img/Cartoon_Robot_b.svg");
+robot.loadSound("chime", "audio/chime.mp3");
+
+var robot2 = scratch.newSprite("robot2");
+robot2.goXY(50, 0);
+robot2.loadCostume("costume1", "img/Cartoon_Robot_a.svg", 0.5);
+robot2.loadCostume("costume2", "img/Cartoon_Robot_b.svg", 0.5);
+robot2.loadSound("chime", "audio/chime.mp3");
+
+scratch.createVariable("touching");
+
+stage.newScript().
+    when_green_flag_clicked.
+    play_sound.c("chime").
+    show_variable.c("touching");
 
 robot.newScript().
-    when_sprite_clicked.
-    //forever.begin.
+    when_green_flag_clicked.
+    repeat.c(3).begin.
         costume.c("costume1").
-        move.c(10).
-        wait.c(1).
+        move.c(1).
+        set_to.c("touching").touching.c("robot2").
+        wait.c(0.1).
         costume.c("costume2").
-        move.c(-10).
-        wait.c(1);
-    //end;
+        move.c(1).
+        set_to.c("touching").touching.c("robot2").
+        wait.c(0.1).
+        stop_all_sounds.
+    end.
+    play_sound.c("chime");
+
+var _d = 90;
+robot2.newScript().
+    when_green_flag_clicked.
+    forever.begin.
+        point_dir.f(function() { return _d++; }).
+        move.c(1).
+    end;
+
+
