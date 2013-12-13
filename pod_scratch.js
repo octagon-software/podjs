@@ -424,7 +424,7 @@ PodJS.ScratchPod = function(options) {
                 }
             }
         });
-
+        
         /**
          * X position of the list variable on the stage, when shown.
          *
