@@ -1,4 +1,4 @@
 podjs
 =====
 
-pod.js core source code and examples
+See [http://podjs.com](http://podjs.com)
